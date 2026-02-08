@@ -1,0 +1,126 @@
+import pytest
+
+from lumberjack.types import (
+    AgentConfig,
+    AgentDef,
+    BranchType,
+    EnvConfig,
+    InitConfig,
+    LumberjackConfig,
+    LumberjackError,
+    NamingScheme,
+    StateFile,
+    SubmodulesConfig,
+    WorktreeInfo,
+)
+
+
+def test_namingScheme_values():
+    assert NamingScheme.MINERALS == "minerals"
+    assert NamingScheme.CITIES == "cities"
+    assert NamingScheme.COMPOUND == "compound"
+
+
+def test_namingScheme_membership():
+    assert "minerals" in NamingScheme._value2member_map_
+    assert "bogus" not in NamingScheme._value2member_map_
+
+
+def test_branchType_values():
+    assert BranchType.FEATURE == "feature"
+    assert BranchType.FIX == "fix"
+    assert BranchType.HOTFIX == "hotfix"
+    assert BranchType.CHORE == "chore"
+    assert BranchType.REFACTOR == "refactor"
+
+
+def test_lumberjackConfig_defaults():
+    cfg = LumberjackConfig()
+    assert cfg.worktree_dir == ".lj"
+    assert cfg.branch_template == "{user}/{type}/{name}"
+    assert cfg.user == ""
+    assert cfg.default_type == "feature"
+    assert cfg.base_branch == "main"
+    assert cfg.naming_scheme == NamingScheme.MINERALS
+    assert cfg.init.auto_init is True
+    assert cfg.env.auto_copy is True
+    assert cfg.submodules.recursive is True
+    assert cfg.agent.auto_launch is False
+    assert cfg.default_agent == "claude"
+
+
+def test_lumberjackConfig_frozen():
+    cfg = LumberjackConfig()
+    with pytest.raises(AttributeError):
+        cfg.user = "changed"  # type: ignore[misc]
+
+
+def test_initConfig_defaults():
+    ic = InitConfig()
+    assert ic.init_command is None
+    assert ic.auto_init is True
+    assert ic.post_init == []
+
+
+def test_envConfig_defaults():
+    ec = EnvConfig()
+    assert ec.auto_copy is True
+    assert ".env" in ec.patterns
+    assert "!.env.example" in ec.patterns
+    assert ec.scan_depth == 3
+    assert ec.scan_dirs is None
+
+
+def test_submodulesConfig_frozen():
+    sc = SubmodulesConfig()
+    with pytest.raises(AttributeError):
+        sc.auto_init = False  # type: ignore[misc]
+
+
+def test_agentConfig_frozen():
+    ac = AgentConfig()
+    with pytest.raises(AttributeError):
+        ac.inject_context = False  # type: ignore[misc]
+
+
+def test_agentDef_frozen():
+    ad = AgentDef(binary="claude", context_file="CLAUDE.md")
+    assert ad.binary == "claude"
+    with pytest.raises(AttributeError):
+        ad.binary = "other"  # type: ignore[misc]
+
+
+def test_worktreeInfo_mutable():
+    wt = WorktreeInfo(
+        name="test", branch="main", base_branch="main", type="feature", path="/tmp/test"
+    )
+    wt.status = "3 modified"
+    assert wt.status == "3 modified"
+
+
+def test_worktreeInfo_defaults():
+    wt = WorktreeInfo(
+        name="test", branch="main", base_branch="main", type="feature", path="/tmp/test"
+    )
+    assert wt.created_at == ""
+    assert wt.ahead == 0
+    assert wt.behind == 0
+
+
+def test_stateFile_defaults():
+    sf = StateFile()
+    assert sf.version == 1
+    assert sf.repo_root == ""
+    assert sf.worktrees == {}
+
+
+def test_stateFile_frozen():
+    sf = StateFile()
+    with pytest.raises(AttributeError):
+        sf.version = 2  # type: ignore[misc]
+
+
+def test_lumberjackError():
+    err = LumberjackError("boom")
+    assert str(err) == "boom"
+    assert isinstance(err, Exception)

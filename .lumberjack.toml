@@ -1,0 +1,30 @@
+[lumberjack]
+worktree_dir = ".lj"
+branch_template = "{user}/{type}/{name}"
+user = "nc9"
+default_type = "feature"
+base_branch = "main"
+naming_scheme = "minerals"
+default_agent = "claude"
+
+[lumberjack.init]
+init_command = "uv sync"
+auto_init = true
+
+[lumberjack.env]
+auto_copy = true
+patterns = [
+    ".env",
+    ".env.*",
+    "!.env.example",
+    "!.env.template",
+]
+scan_depth = 3
+
+[lumberjack.submodules]
+auto_init = true
+recursive = true
+
+[lumberjack.agent]
+auto_launch = false
+inject_context = true

@@ -5,9 +5,11 @@ Git worktree manager for parallel coding agent development.
 ## Install
 
 ```bash
-uv tool install .
-# or
-uv pip install -e .
+# global CLI (recommended)
+uv tool install timberline
+
+# or with pip
+pip install timberline
 ```
 
 ## Quick Start
@@ -22,6 +24,55 @@ cd $(tl cd auth-refactor)   # jump into worktree
 tl rm auth-refactor         # clean up
 ```
 
+## Getting Started
+
+Run `tl init` inside any git repo to create `.timberline.toml`. The wizard auto-detects:
+
+- **Branch prefix** from your git user
+- **Base branch** (main/master/develop)
+- **Package manager** (bun, npm, pnpm, yarn, uv, pip, cargo, etc.) for dependency install
+- **Pre-land checks** (Makefile targets, npm scripts like `lint`, `test`, `check`)
+- **Default agent** (claude, codex, opencode, aider) if installed
+
+Use `--defaults` to skip prompts and accept detected values.
+
+## Create & Enter a Worktree
+
+```bash
+tl new auth-refactor            # named worktree
+tl new --type fix               # auto-named (minerals, cities, or compound)
+tl new --agent                  # create + launch coding agent
+```
+
+Enter a worktree:
+
+```bash
+cd $(tl cd auth-refactor)       # subshell-friendly
+```
+
+Or with shell integration (`tl install`):
+
+```bash
+tlcd auth-refactor              # cd directly
+```
+
+Each worktree gets its own branch (from `branch_template`), dependencies installed via `auto_init`, and `.env` files copied from the main repo.
+
+## Land a PR
+
+```bash
+tl land auth-refactor           # checks → push → PR
+tl land --draft                 # create as draft PR
+tl land --skip-checks           # bypass pre-land checks
+```
+
+`tl land` runs your configured `pre_land` command (e.g. `make check`), pushes the branch, then creates a PR via `gh`. Configure it in `.timberline.toml`:
+
+```toml
+[timberline]
+pre_land = "make check"  # or "bun run lint && bun run test", etc.
+```
+
 ## Commands
 
 | Command | Description |
@@ -33,17 +84,20 @@ tl rm auth-refactor         # clean up
 | `tl cd <name>` | Print worktree path. `--shell` for subshell |
 | `tl status` | Git status across all worktrees |
 | `tl sync [name]` | Rebase/merge on base branch. `--all`, `--merge` |
+| `tl land [name]` | Run checks, push, and create PR. `--draft`, `--skip-checks` |
+| `tl rename <branch>` | Rename worktree's git branch. `-n <name>` |
 | `tl agent [name]` | Launch coding agent in worktree. `--new` |
 | `tl run-init [name]` | Re-run dependency install |
+| `tl pr [name]` | Create PR via gh CLI. `--draft` |
 | `tl env sync [name]` | Re-copy .env files from main repo |
 | `tl env ls` | List discovered .env files |
 | `tl env diff [name]` | Show .env differences |
-| `tl pr [name]` | Create PR via gh CLI. `--draft` |
 | `tl clean` | Prune stale worktrees. `--dry-run` |
+| `tl install` | Install shell integration into rc file. `--uninstall` |
+| `tl shell-init` | Output shell integration script |
 | `tl config show` | Print resolved config |
 | `tl config set <k> <v>` | Set config value |
 | `tl config edit` | Open config in $EDITOR |
-| `tl shell-init` | Output shell integration script |
 
 ## Config
 
@@ -58,6 +112,7 @@ default_type = "feature"
 base_branch = "main"
 naming_scheme = "minerals"  # minerals | cities | compound
 default_agent = "claude"   # claude | codex | opencode | aider
+pre_land = "make check"    # command to run before pushing
 
 [timberline.init]
 auto_init = true
@@ -81,7 +136,10 @@ inject_context = true
 ## Shell Integration
 
 ```bash
-# Add to .zshrc / .bashrc:
+# Automatic install:
+tl install
+
+# Or manually add to .zshrc / .bashrc:
 eval "$(tl shell-init)"
 
 # Then use:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 
-from lumberjack.types import LumberjackError, NamingScheme
+from timberline.types import NamingScheme, TimberlineError
 
 MINERALS = [
     "obsidian",
@@ -163,4 +163,4 @@ def generateName(scheme: NamingScheme, existing: set[str]) -> str:
         if candidate not in existing:
             return candidate
 
-    raise LumberjackError("Could not generate unique name — clean up old worktrees!")
+    raise TimberlineError("Could not generate unique name — clean up old worktrees!")

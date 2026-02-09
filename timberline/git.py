@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from lumberjack.types import LumberjackError
+from timberline.types import TimberlineError
 
 
 def runGit(*args: str, cwd: Path | None = None) -> str:
@@ -17,9 +17,9 @@ def runGit(*args: str, cwd: Path | None = None) -> str:
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
-        raise LumberjackError(f"git {' '.join(args)} failed: {e.stderr.strip()}") from e
+        raise TimberlineError(f"git {' '.join(args)} failed: {e.stderr.strip()}") from e
     except FileNotFoundError:
-        raise LumberjackError("git not found — is it installed?") from None
+        raise TimberlineError("git not found — is it installed?") from None
 
 
 def findRepoRoot(cwd: Path | None = None) -> Path:
@@ -68,7 +68,7 @@ def resolveUser() -> str | None:
         name = runGit("config", "user.name")
         if name:
             return name.lower().replace(" ", "-")
-    except LumberjackError:
+    except TimberlineError:
         pass
 
     return None
@@ -120,14 +120,18 @@ def getAheadBehind(branch: str, base: str, cwd: Path) -> tuple[int, int]:
         parts = output.split()
         if len(parts) == 2:
             return int(parts[1]), int(parts[0])
-    except LumberjackError:
+    except TimberlineError:
         pass
     return 0, 0
+
+
+def renameBranch(old: str, new: str, cwd: Path | None = None) -> None:
+    runGit("branch", "-m", old, new, cwd=cwd)
 
 
 def branchExists(name: str, cwd: Path | None = None) -> bool:
     try:
         runGit("rev-parse", "--verify", f"refs/heads/{name}", cwd=cwd)
         return True
-    except LumberjackError:
+    except TimberlineError:
         return False

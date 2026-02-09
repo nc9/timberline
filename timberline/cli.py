@@ -8,20 +8,20 @@ from typing import Annotated
 
 import typer
 
-from lumberjack.agent import (
+from timberline.agent import (
     buildEnvVars,
     detectInstalledAgents,
     getAgentDef,
     injectAgentContext,
     launchAgent,
 )
-from lumberjack.config import (
+from timberline.config import (
     configExists,
     loadConfig,
     updateConfigField,
     writeConfig,
 )
-from lumberjack.display import (
+from timberline.display import (
     printConfig,
     printCreateSummary,
     printError,
@@ -32,25 +32,32 @@ from lumberjack.display import (
     printWorktreePaths,
     printWorktreeTable,
 )
-from lumberjack.env import copyEnvFiles, diffEnvFiles, discoverEnvFiles, listEnvFiles
-from lumberjack.git import (
+from timberline.env import copyEnvFiles, diffEnvFiles, discoverEnvFiles, listEnvFiles
+from timberline.git import (
     findRepoRoot,
     getAheadBehind,
     getCurrentBranch,
     getDefaultBranch,
+    renameBranch,
     resolveUser,
     runGit,
 )
-from lumberjack.init_deps import detectAndInstall, detectInstaller
-from lumberjack.shell import generateShellInit
-from lumberjack.submodules import hasSubmodules, initSubmodules
-from lumberjack.types import (
-    LumberjackConfig,
-    LumberjackError,
+from timberline.init_deps import detectAndInstall, detectInstaller, detectPreLand
+from timberline.shell import (
+    detectShell,
+    generateShellInit,
+    installShellInit,
+    uninstallShellInit,
+)
+from timberline.state import loadState, saveState, updateWorktreeBranch
+from timberline.submodules import hasSubmodules, initSubmodules
+from timberline.types import (
     NamingScheme,
+    TimberlineConfig,
+    TimberlineError,
     WorktreeInfo,
 )
-from lumberjack.worktree import (
+from timberline.worktree import (
     createWorktree,
     getWorktree,
     listWorktrees,
@@ -58,14 +65,14 @@ from lumberjack.worktree import (
 )
 
 app = typer.Typer(
-    name="lj",
+    name="tl",
     help="Git worktree manager for parallel coding agent development",
     no_args_is_help=True,
     pretty_exceptions_enable=False,
 )
 
 env_app = typer.Typer(help="Manage .env files across worktrees", no_args_is_help=True)
-config_app = typer.Typer(help="Manage lumberjack configuration", no_args_is_help=True)
+config_app = typer.Typer(help="Manage timberline configuration", no_args_is_help=True)
 app.add_typer(env_app, name="env")
 app.add_typer(config_app, name="config")
 
@@ -73,13 +80,66 @@ app.add_typer(config_app, name="config")
 def _resolveRoot() -> Path:
     try:
         return findRepoRoot()
-    except LumberjackError as e:
+    except TimberlineError as e:
         printError(str(e))
         raise typer.Exit(1) from e
 
 
-def _loadCfg(repo_root: Path) -> LumberjackConfig:
+def _loadCfg(repo_root: Path) -> TimberlineConfig:
     return loadConfig(repo_root)
+
+
+def _resolveWorktree(repo_root: Path, config: TimberlineConfig, name: str | None) -> WorktreeInfo:
+    """Resolve worktree by name or current directory. Exits on failure."""
+    if name:
+        wt = getWorktree(repo_root, config, name)
+        if not wt:
+            printError(f"Worktree '{name}' not found")
+            raise typer.Exit(1)
+        return wt
+
+    try:
+        branch = getCurrentBranch()
+        worktrees = listWorktrees(repo_root, config)
+        wt = next((w for w in worktrees if w.branch == branch), None)
+    except TimberlineError:
+        wt = None
+
+    if not wt:
+        printError("Not in a worktree. Specify a name.")
+        raise typer.Exit(1)
+    return wt
+
+
+def _pushAndCreatePr(
+    wt: WorktreeInfo, config: TimberlineConfig, draft: bool, wt_path: Path
+) -> None:
+    """Push branch and create PR via gh CLI."""
+    try:
+        runGit("push", "-u", "origin", wt.branch, cwd=wt_path)
+    except TimberlineError as e:
+        printError(f"Push failed: {e}")
+        raise typer.Exit(1) from e
+
+    cmd = [
+        "gh",
+        "pr",
+        "create",
+        "--head",
+        wt.branch,
+        "--base",
+        wt.base_branch or config.base_branch,
+    ]
+    if draft:
+        cmd.append("--draft")
+    cmd.extend(["--fill"])
+
+    try:
+        result = subprocess.run(cmd, cwd=wt_path, capture_output=True, text=True, check=True)
+        printSuccess(f"PR created: {result.stdout.strip()}")
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        printError("PR creation failed (is gh CLI installed?)")
+        raise typer.Exit(1) from e
 
 
 # ─── init ──────────────────────────────────────────────────────────────────────
@@ -90,11 +150,11 @@ def init(
     defaults: Annotated[bool, typer.Option("--defaults", help="Accept all defaults")] = False,
     user: Annotated[str | None, typer.Option(help="GitHub username")] = None,
 ) -> None:
-    """Initialize lumberjack in this repo."""
+    """Initialize timberline in this repo."""
     repo_root = _resolveRoot()
 
     if configExists(repo_root):
-        printWarning(".lumberjack.toml already exists")
+        printWarning(".timberline.toml already exists")
         if not defaults:
             overwrite = typer.confirm("Overwrite?", default=False)
             if not overwrite:
@@ -118,7 +178,7 @@ def init(
     naming = NamingScheme.MINERALS
 
     # detect env files
-    default_cfg = LumberjackConfig()
+    default_cfg = TimberlineConfig()
     env_files = discoverEnvFiles(repo_root, default_cfg.env)
 
     # detect submodules
@@ -139,25 +199,31 @@ def init(
     else:
         printWarning("No known coding agents found on PATH")
 
+    # detect pre-land checks
+    pre_land = detectPreLand(repo_root)
+
     if not defaults:
         printSuccess(f"Git root: {repo_root}")
         if env_files:
             printSuccess(f"Found {len(env_files)} .env files to auto-copy")
         if has_subs:
             printSuccess("Found git submodules")
+        if pre_land:
+            printSuccess(f"Detected pre-land checks: {pre_land}")
 
-    config = LumberjackConfig(
+    config = TimberlineConfig(
         user=resolved_user,
         base_branch=base,
         naming_scheme=naming,
         default_agent=default_agent,
+        pre_land=pre_land,
         init=default_cfg.init
         if not init_command
         else default_cfg.init.__class__(init_command=init_command, auto_init=True, post_init=[]),
     )
 
     writeConfig(repo_root, config)
-    printSuccess("Created .lumberjack.toml")
+    printSuccess("Created .timberline.toml")
 
     # update .gitignore
     gitignore = repo_root / ".gitignore"
@@ -171,7 +237,7 @@ def init(
         gitignore.write_text(f"{wt_dir}\n")
         printSuccess("Created .gitignore")
 
-    printSuccess("Ready — run `lj new` to create your first worktree")
+    printSuccess("Ready — run `tl new` to create your first worktree")
 
 
 # ─── new / create ─────────────────────────────────────────────────────────────
@@ -197,7 +263,7 @@ def new_cmd(
 
     try:
         info = createWorktree(repo_root, config, name=name, branch=branch, base=base, type_=type_)
-    except LumberjackError as e:
+    except TimberlineError as e:
         printError(str(e))
         raise typer.Exit(1) from e
 
@@ -231,6 +297,9 @@ def new_cmd(
 
     printCreateSummary(info, steps)
 
+    # stdout path for shell function `tln` to capture
+    print(info.path)
+
     # launch agent
     if agent or config.agent.auto_launch:
         agent_def = getAgentDef(config.default_agent)
@@ -249,7 +318,7 @@ def create_cmd(
     no_submodules: Annotated[bool, typer.Option("--no-submodules")] = False,
     agent: Annotated[bool, typer.Option("--agent")] = False,
 ) -> None:
-    """Alias for `lj new`."""
+    """Alias for `tl new`."""
     new_cmd(name, type_, branch, base, no_init, no_env, no_submodules, agent)
 
 
@@ -279,7 +348,7 @@ def list_cmd(
     json_output: Annotated[bool, typer.Option("--json")] = False,
     paths: Annotated[bool, typer.Option("--paths")] = False,
 ) -> None:
-    """Alias for `lj ls`."""
+    """Alias for `tl ls`."""
     ls_cmd(json_output, paths)
 
 
@@ -303,7 +372,7 @@ def rm_cmd(
             try:
                 removeWorktree(repo_root, config, wt.name, force=force, keep_branch=keep_branch)
                 printSuccess(f"Removed {wt.name}")
-            except LumberjackError as e:
+            except TimberlineError as e:
                 printError(str(e))
         return
 
@@ -314,7 +383,7 @@ def rm_cmd(
     try:
         removeWorktree(repo_root, config, name, force=force, keep_branch=keep_branch)
         printSuccess(f"Removed {name}")
-    except LumberjackError as e:
+    except TimberlineError as e:
         printError(str(e))
         raise typer.Exit(1) from e
 
@@ -326,7 +395,7 @@ def remove_cmd(
     keep_branch: Annotated[bool, typer.Option("--keep-branch")] = False,
     all_: Annotated[bool, typer.Option("--all")] = False,
 ) -> None:
-    """Alias for `lj rm`."""
+    """Alias for `tl rm`."""
     rm_cmd(name, force, keep_branch, all_)
 
 
@@ -348,7 +417,7 @@ def cd_cmd(
         raise typer.Exit(1)
 
     if shell:
-        env = {**os.environ, "LJ_WORKTREE": wt.name, "LJ_BRANCH": wt.branch}
+        env = {**os.environ, "TL_WORKTREE": wt.name, "TL_BRANCH": wt.branch}
         user_shell = os.environ.get("SHELL", "/bin/bash")
         os.execve(user_shell, [user_shell], {**env, "PWD": wt.path})
     else:
@@ -370,7 +439,7 @@ def status() -> None:
             ahead, behind = getAheadBehind(wt.branch, wt.base_branch, Path(wt.path))
             wt.ahead = ahead
             wt.behind = behind
-        except LumberjackError:
+        except TimberlineError:
             pass
 
     printStatusList(worktrees)
@@ -390,33 +459,15 @@ def sync(
     config = _loadCfg(repo_root)
 
     # fetch first
-    with contextlib.suppress(LumberjackError):
+    with contextlib.suppress(TimberlineError):
         runGit("fetch", "--all", "--prune", cwd=repo_root)
 
     targets: list[WorktreeInfo] = []
     if all_:
         targets = listWorktrees(repo_root, config)
-    elif name:
-        wt = getWorktree(repo_root, config, name)
-        if not wt:
-            printError(f"Worktree '{name}' not found")
-            raise typer.Exit(1)
-        targets = [wt]
     else:
-        # try current directory
-        try:
-            branch = getCurrentBranch()
-            worktrees = listWorktrees(repo_root, config)
-            for wt in worktrees:
-                if wt.branch == branch:
-                    targets = [wt]
-                    break
-        except LumberjackError:
-            pass
-
-    if not targets:
-        printError("No worktree to sync. Specify a name or use --all.")
-        raise typer.Exit(1)
+        wt = _resolveWorktree(repo_root, config, name)
+        targets = [wt]
 
     for wt in targets:
         wt_path = Path(wt.path)
@@ -425,7 +476,7 @@ def sync(
         try:
             runGit(cmd, f"origin/{base}", cwd=wt_path)
             printSuccess(f"Synced {wt.name} ({cmd} on {base})")
-        except LumberjackError as e:
+        except TimberlineError as e:
             printError(f"Failed to sync {wt.name}: {e}")
 
 
@@ -445,24 +496,7 @@ def agent_cmd(
         new_cmd(name=new, agent=True)
         return
 
-    if name:
-        wt = getWorktree(repo_root, config, name)
-        if not wt:
-            printError(f"Worktree '{name}' not found")
-            raise typer.Exit(1)
-    else:
-        # try current worktree
-        try:
-            branch = getCurrentBranch()
-            worktrees = listWorktrees(repo_root, config)
-            wt = next((w for w in worktrees if w.branch == branch), None)
-        except LumberjackError:
-            wt = None
-
-        if not wt:
-            printError("Not in a worktree. Specify a name.")
-            raise typer.Exit(1)
-
+    wt = _resolveWorktree(repo_root, config, name)
     agent_def = getAgentDef(config.default_agent)
     env_vars = buildEnvVars(wt, repo_root)
     launchAgent(agent_def, Path(wt.path), env_vars)
@@ -478,20 +512,7 @@ def run_init_cmd(
     """Re-run dependency install on a worktree."""
     repo_root = _resolveRoot()
     config = _loadCfg(repo_root)
-
-    if name:
-        wt = getWorktree(repo_root, config, name)
-    else:
-        try:
-            branch = getCurrentBranch()
-            worktrees = listWorktrees(repo_root, config)
-            wt = next((w for w in worktrees if w.branch == branch), None)
-        except LumberjackError:
-            wt = None
-
-    if not wt:
-        printError("Worktree not found")
-        raise typer.Exit(1)
+    wt = _resolveWorktree(repo_root, config, name)
 
     results = detectAndInstall(Path(wt.path), config.init)
     for desc, ok in results:
@@ -587,50 +608,97 @@ def pr_cmd(
     """Create a PR from a worktree branch."""
     repo_root = _resolveRoot()
     config = _loadCfg(repo_root)
+    wt = _resolveWorktree(repo_root, config, name)
+    _pushAndCreatePr(wt, config, draft, Path(wt.path))
 
-    if name:
-        wt = getWorktree(repo_root, config, name)
-    else:
-        try:
-            branch = getCurrentBranch()
-            worktrees = listWorktrees(repo_root, config)
-            wt = next((w for w in worktrees if w.branch == branch), None)
-        except LumberjackError:
-            wt = None
 
-    if not wt:
-        printError("Worktree not found")
-        raise typer.Exit(1)
+# ─── land ──────────────────────────────────────────────────────────────────────
 
+
+@app.command()
+def land(
+    name: Annotated[str | None, typer.Argument(help="Worktree name")] = None,
+    draft: Annotated[bool, typer.Option("--draft", help="Create as draft PR")] = False,
+    skip_checks: Annotated[
+        bool, typer.Option("--skip-checks", help="Skip pre-land checks")
+    ] = False,
+) -> None:
+    """Run checks, push, and create a PR."""
+    repo_root = _resolveRoot()
+    config = _loadCfg(repo_root)
+    wt = _resolveWorktree(repo_root, config, name)
     wt_path = Path(wt.path)
 
-    # push branch
-    try:
-        runGit("push", "-u", "origin", wt.branch, cwd=wt_path)
-    except LumberjackError as e:
-        printError(f"Push failed: {e}")
-        raise typer.Exit(1) from e
+    # run pre-land checks
+    if not skip_checks and config.pre_land:
+        printSuccess(f"Running checks: {config.pre_land}")
+        try:
+            subprocess.run(
+                config.pre_land,
+                cwd=wt_path,
+                shell=True,
+                check=True,
+            )
+            printSuccess("Checks passed")
+        except subprocess.CalledProcessError as e:
+            printError(f"Checks failed (exit {e.returncode})")
+            raise typer.Exit(1) from e
 
-    # create PR
-    cmd = [
-        "gh",
-        "pr",
-        "create",
-        "--head",
-        wt.branch,
-        "--base",
-        wt.base_branch or config.base_branch,
-    ]
-    if draft:
-        cmd.append("--draft")
-    cmd.extend(["--fill"])
+    _pushAndCreatePr(wt, config, draft, wt_path)
 
-    try:
-        result = subprocess.run(cmd, cwd=wt_path, capture_output=True, text=True, check=True)
-        printSuccess(f"PR created: {result.stdout.strip()}")
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        printError("PR creation failed (is gh CLI installed?)")
-        raise typer.Exit(1) from e
+
+# ─── rename ────────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def rename(
+    new_branch: Annotated[str, typer.Argument(help="New branch name")],
+    name: Annotated[str | None, typer.Option("--name", "-n", help="Worktree name")] = None,
+) -> None:
+    """Rename a worktree's git branch."""
+    repo_root = _resolveRoot()
+    config = _loadCfg(repo_root)
+    wt = _resolveWorktree(repo_root, config, name)
+    wt_path = Path(wt.path)
+
+    old_branch = wt.branch
+    renameBranch(old_branch, new_branch, cwd=wt_path)
+
+    # update state
+    state = loadState(repo_root, config.worktree_dir)
+    state = updateWorktreeBranch(state, wt.name, new_branch)
+    saveState(repo_root, config.worktree_dir, state)
+
+    printSuccess(f"Renamed {old_branch} → {new_branch}")
+
+
+# ─── install ──────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def install(
+    uninstall: Annotated[
+        bool, typer.Option("--uninstall", help="Remove shell integration")
+    ] = False,
+    shell: Annotated[str | None, typer.Option(help="Shell type (bash/zsh/fish)")] = None,
+) -> None:
+    """Install shell integration into rc file."""
+    s = shell or detectShell()
+
+    if uninstall:
+        rc, changed = uninstallShellInit(s)
+        if changed:
+            printSuccess(f"Removed timberline from {rc}")
+        else:
+            printWarning(f"No timberline block found in {rc}")
+        return
+
+    rc, changed = installShellInit(s)
+    if changed:
+        printSuccess(f"Added timberline to {rc}")
+        printSuccess(f"Restart your shell or run: source {rc}")
+    else:
+        printWarning(f"Already installed in {rc}")
 
 
 # ─── clean ─────────────────────────────────────────────────────────────────────
@@ -669,12 +737,12 @@ def config_show_cmd() -> None:
 
 @config_app.command("edit")
 def config_edit_cmd() -> None:
-    """Open .lumberjack.toml in $EDITOR."""
+    """Open .timberline.toml in $EDITOR."""
     repo_root = _resolveRoot()
-    config_path = repo_root / ".lumberjack.toml"
+    config_path = repo_root / ".timberline.toml"
 
     if not config_path.exists():
-        printError("No .lumberjack.toml found. Run `lj init` first.")
+        printError("No .timberline.toml found. Run `tl init` first.")
         raise typer.Exit(1)
 
     editor = os.environ.get("EDITOR", "vi")

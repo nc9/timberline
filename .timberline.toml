@@ -1,5 +1,5 @@
-[lumberjack]
-worktree_dir = ".lj"
+[timberline]
+worktree_dir = ".tl"
 branch_template = "{user}/{type}/{name}"
 user = "nc9"
 default_type = "feature"
@@ -7,11 +7,11 @@ base_branch = "main"
 naming_scheme = "minerals"
 default_agent = "claude"
 
-[lumberjack.init]
+[timberline.init]
 init_command = "uv sync"
 auto_init = true
 
-[lumberjack.env]
+[timberline.env]
 auto_copy = true
 patterns = [
     ".env",
@@ -21,10 +21,10 @@ patterns = [
 ]
 scan_depth = 3
 
-[lumberjack.submodules]
+[timberline.submodules]
 auto_init = true
 recursive = true
 
-[lumberjack.agent]
+[timberline.agent]
 auto_launch = false
 inject_context = true

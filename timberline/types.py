@@ -54,14 +54,15 @@ class AgentConfig:
 
 
 @dataclass(frozen=True)
-class LumberjackConfig:
-    worktree_dir: str = ".lj"
+class TimberlineConfig:
+    worktree_dir: str = ".tl"
     branch_template: str = "{user}/{type}/{name}"
     user: str = ""
     default_type: str = "feature"
     base_branch: str = "main"
     naming_scheme: NamingScheme = NamingScheme.MINERALS
     default_agent: str = "claude"
+    pre_land: str | None = None
     init: InitConfig = field(default_factory=InitConfig)
     env: EnvConfig = field(default_factory=EnvConfig)
     submodules: SubmodulesConfig = field(default_factory=SubmodulesConfig)
@@ -88,5 +89,5 @@ class StateFile:
     worktrees: dict[str, dict[str, str]] = field(default_factory=dict)
 
 
-class LumberjackError(Exception):
+class TimberlineError(Exception):
     pass

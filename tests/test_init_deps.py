@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lumberjack.init_deps import (
+from timberline.init_deps import (
     detectInstaller,
+    detectPreLand,
     findProjectDirs,
     isDifferentEcosystem,
 )
@@ -66,3 +67,39 @@ def test_findProjectDirs_skips_node_modules(tmp_path: Path):
     (nm / "package.json").write_text("{}")
 
     assert findProjectDirs(tmp_path) == []
+
+
+def test_detectPreLand_makefile_check(tmp_path: Path):
+    (tmp_path / "Makefile").write_text("check: fmt lint test\n")
+    assert detectPreLand(tmp_path) == "make check"
+
+
+def test_detectPreLand_package_json_check_bun(tmp_path: Path):
+    (tmp_path / "package.json").write_text('{"scripts":{"check":"tsc && vitest"}}')
+    (tmp_path / "bun.lock").write_text("")
+    assert detectPreLand(tmp_path) == "bun run check"
+
+
+def test_detectPreLand_package_json_check_npm(tmp_path: Path):
+    (tmp_path / "package.json").write_text('{"scripts":{"check":"tsc && vitest"}}')
+    assert detectPreLand(tmp_path) == "npm run check"
+
+
+def test_detectPreLand_makefile_test_fallback(tmp_path: Path):
+    (tmp_path / "Makefile").write_text("test:\n\tpytest\n")
+    assert detectPreLand(tmp_path) == "make test"
+
+
+def test_detectPreLand_package_json_test_fallback(tmp_path: Path):
+    (tmp_path / "package.json").write_text('{"scripts":{"test":"vitest"}}')
+    assert detectPreLand(tmp_path) == "npm run test"
+
+
+def test_detectPreLand_none(tmp_path: Path):
+    assert detectPreLand(tmp_path) is None
+
+
+def test_detectPreLand_check_over_test(tmp_path: Path):
+    """check: takes priority over test:."""
+    (tmp_path / "Makefile").write_text("check: fmt lint test\ntest:\n\tpytest\n")
+    assert detectPreLand(tmp_path) == "make check"

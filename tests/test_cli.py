@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from lumberjack.cli import app
+from timberline.cli import app
 
 runner = CliRunner()
 
@@ -25,14 +25,14 @@ def test_help():
 def test_init_defaults(repo_dir: Path):
     result = runner.invoke(app, ["init", "--defaults"])
     assert result.exit_code == 0
-    assert (repo_dir / ".lumberjack.toml").exists()
+    assert (repo_dir / ".timberline.toml").exists()
 
 
 def test_init_creates_gitignore_entry(repo_dir: Path):
     result = runner.invoke(app, ["init", "--defaults"])
     assert result.exit_code == 0
     content = (repo_dir / ".gitignore").read_text()
-    assert ".lj/" in content
+    assert ".tl/" in content
 
 
 def test_new_and_ls(repo_dir: Path):
@@ -128,7 +128,7 @@ def test_config_set(repo_dir: Path):
 def test_shell_init():
     result = runner.invoke(app, ["shell-init"])
     assert result.exit_code == 0
-    assert "ljcd" in result.output
+    assert "tlcd" in result.output
 
 
 def test_status(repo_dir: Path):
@@ -163,7 +163,7 @@ def test_create_alias(repo_dir: Path):
 
 
 def test_full_lifecycle(repo_dir: Path):
-    """Full lj init -> new -> ls -> rm lifecycle."""
+    """Full tl init -> new -> ls -> rm lifecycle."""
     r = runner.invoke(app, ["init", "--defaults", "--user", "test"])
     assert r.exit_code == 0
 
@@ -190,3 +190,60 @@ def test_full_lifecycle(repo_dir: Path):
 
     r = runner.invoke(app, ["ls"])
     assert "beta" not in r.output
+
+
+def test_new_outputs_path_to_stdout(repo_dir: Path):
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    result = runner.invoke(app, ["new", "obsidian", "--no-init"])
+    assert result.exit_code == 0
+    # stdout path is last line (bare print)
+    lines = result.output.strip().splitlines()
+    assert any("obsidian" in line and str(repo_dir) in line for line in lines)
+
+
+def test_rename(repo_dir: Path):
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["new", "obsidian", "--no-init"])
+
+    result = runner.invoke(app, ["rename", "test/fix/new-name", "-n", "obsidian"])
+    assert result.exit_code == 0
+    assert "Renamed" in result.output
+    assert "new-name" in result.output
+
+    # verify branch updated in ls
+    result = runner.invoke(app, ["ls", "--json"])
+    assert "test/fix/new-name" in result.output
+
+
+def test_install_and_uninstall(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("timberline.shell.rcFilePath", lambda s: tmp_path / ".zshrc")
+    monkeypatch.setattr("timberline.cli.detectShell", lambda: "zsh")
+
+    result = runner.invoke(app, ["install"])
+    assert result.exit_code == 0
+    assert "Added" in result.output
+    assert (tmp_path / ".zshrc").exists()
+
+    result = runner.invoke(app, ["install", "--uninstall"])
+    assert result.exit_code == 0
+    assert "Removed" in result.output
+
+
+def test_help_shows_new_commands():
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "install" in result.output
+    assert "rename" in result.output
+    assert "land" in result.output
+
+
+def test_init_detects_pre_land(repo_dir: Path):
+    (repo_dir / "Makefile").write_text("check: fmt lint test\n")
+    result = runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    assert result.exit_code == 0
+    # config should have pre_land
+    import tomllib
+
+    with open(repo_dir / ".timberline.toml", "rb") as f:
+        data = tomllib.load(f)
+    assert data["timberline"]["pre_land"] == "make check"

@@ -1,4 +1,4 @@
-# Lumberjack
+# Timberline
 
 Git worktree manager for parallel coding agent development.
 
@@ -14,44 +14,44 @@ uv pip install -e .
 
 ```bash
 cd your-repo
-lj init --defaults          # create .lumberjack.toml
-lj new auth-refactor        # create worktree + branch
-lj new --type fix           # auto-named fix worktree
-lj ls                       # list all worktrees
-cd $(lj cd auth-refactor)   # jump into worktree
-lj rm auth-refactor         # clean up
+tl init --defaults          # create .timberline.toml
+tl new auth-refactor        # create worktree + branch
+tl new --type fix           # auto-named fix worktree
+tl ls                       # list all worktrees
+cd $(tl cd auth-refactor)   # jump into worktree
+tl rm auth-refactor         # clean up
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `lj init` | Interactive setup, write `.lumberjack.toml` |
-| `lj new [name]` | Create worktree (aliases: `create`) |
-| `lj ls` | List worktrees (aliases: `list`). `--json`, `--paths` |
-| `lj rm <name>` | Remove worktree (aliases: `remove`). `--force`, `--keep-branch`, `--all` |
-| `lj cd <name>` | Print worktree path. `--shell` for subshell |
-| `lj status` | Git status across all worktrees |
-| `lj sync [name]` | Rebase/merge on base branch. `--all`, `--merge` |
-| `lj agent [name]` | Launch coding agent in worktree. `--new` |
-| `lj run-init [name]` | Re-run dependency install |
-| `lj env sync [name]` | Re-copy .env files from main repo |
-| `lj env ls` | List discovered .env files |
-| `lj env diff [name]` | Show .env differences |
-| `lj pr [name]` | Create PR via gh CLI. `--draft` |
-| `lj clean` | Prune stale worktrees. `--dry-run` |
-| `lj config show` | Print resolved config |
-| `lj config set <k> <v>` | Set config value |
-| `lj config edit` | Open config in $EDITOR |
-| `lj shell-init` | Output shell integration script |
+| `tl init` | Interactive setup, write `.timberline.toml` |
+| `tl new [name]` | Create worktree (aliases: `create`) |
+| `tl ls` | List worktrees (aliases: `list`). `--json`, `--paths` |
+| `tl rm <name>` | Remove worktree (aliases: `remove`). `--force`, `--keep-branch`, `--all` |
+| `tl cd <name>` | Print worktree path. `--shell` for subshell |
+| `tl status` | Git status across all worktrees |
+| `tl sync [name]` | Rebase/merge on base branch. `--all`, `--merge` |
+| `tl agent [name]` | Launch coding agent in worktree. `--new` |
+| `tl run-init [name]` | Re-run dependency install |
+| `tl env sync [name]` | Re-copy .env files from main repo |
+| `tl env ls` | List discovered .env files |
+| `tl env diff [name]` | Show .env differences |
+| `tl pr [name]` | Create PR via gh CLI. `--draft` |
+| `tl clean` | Prune stale worktrees. `--dry-run` |
+| `tl config show` | Print resolved config |
+| `tl config set <k> <v>` | Set config value |
+| `tl config edit` | Open config in $EDITOR |
+| `tl shell-init` | Output shell integration script |
 
 ## Config
 
-`.lumberjack.toml` in repo root:
+`.timberline.toml` in repo root:
 
 ```toml
-[lumberjack]
-worktree_dir = ".lj"
+[timberline]
+worktree_dir = ".tl"
 branch_template = "{user}/{type}/{name}"
 user = "nc9"
 default_type = "feature"
@@ -59,21 +59,21 @@ base_branch = "main"
 naming_scheme = "minerals"  # minerals | cities | compound
 default_agent = "claude"   # claude | codex | opencode | aider
 
-[lumberjack.init]
+[timberline.init]
 auto_init = true
 # init_command = "bun run init"
 # post_init = ["echo done"]
 
-[lumberjack.env]
+[timberline.env]
 auto_copy = true
 patterns = [".env", ".env.*", "!.env.example", "!.env.template"]
 scan_depth = 3
 
-[lumberjack.submodules]
+[timberline.submodules]
 auto_init = true
 recursive = true
 
-[lumberjack.agent]
+[timberline.agent]
 auto_launch = false
 inject_context = true
 ```
@@ -82,11 +82,11 @@ inject_context = true
 
 ```bash
 # Add to .zshrc / .bashrc:
-eval "$(lj shell-init)"
+eval "$(tl shell-init)"
 
 # Then use:
-ljcd obsidian       # cd into worktree
-lj-prompt           # worktree name for PS1
+tlcd obsidian       # cd into worktree
+tl-prompt           # worktree name for PS1
 ```
 
 ## Development

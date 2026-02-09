@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from rich.console import Console
 from rich.table import Table
 
-from lumberjack.types import LumberjackConfig, WorktreeInfo
+from timberline.types import TimberlineConfig, WorktreeInfo
 
 _console = Console(stderr=True)
 _stdout = Console()
@@ -77,8 +77,8 @@ def printCreateSummary(info: WorktreeInfo, steps: list[str]) -> None:
     _console.print()
 
 
-def printConfig(config: LumberjackConfig) -> None:
-    _console.print("[bold]Lumberjack Config[/bold]")
+def printConfig(config: TimberlineConfig) -> None:
+    _console.print("[bold]Timberline Config[/bold]")
     _console.print(f"  worktree_dir:    {config.worktree_dir}")
     _console.print(f"  branch_template: {config.branch_template}")
     _console.print(f"  user:            {config.user}")

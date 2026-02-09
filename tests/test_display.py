@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from lumberjack.display import formatAge, printWorktreeTable
-from lumberjack.types import WorktreeInfo
+from timberline.display import formatAge, printWorktreeTable
+from timberline.types import WorktreeInfo
 
 
 def test_formatAge_just_now():
@@ -45,7 +45,7 @@ def test_printWorktreeTable_with_data():
         branch="nik/feature/obsidian",
         base_branch="main",
         type="feature",
-        path="/repo/.lj/obsidian",
+        path="/repo/.tl/obsidian",
         status="clean",
     )
     # should not crash

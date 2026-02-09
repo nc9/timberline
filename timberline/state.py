@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lumberjack.types import StateFile, WorktreeInfo
+from timberline.types import StateFile, WorktreeInfo
 
-STATE_FILENAME = ".lj-state.json"
+STATE_FILENAME = ".tl-state.json"
 
 
 def _stateFilePath(repo_root: Path, worktree_dir: str) -> Path:
@@ -52,6 +52,18 @@ def addWorktreeToState(state: StateFile, info: WorktreeInfo) -> StateFile:
     )
 
 
+def updateWorktreeBranch(state: StateFile, name: str, new_branch: str) -> StateFile:
+    if name not in state.worktrees:
+        return state
+    new_worktrees = dict(state.worktrees)
+    new_worktrees[name] = {**new_worktrees[name], "branch": new_branch}
+    return StateFile(
+        version=state.version,
+        repo_root=state.repo_root,
+        worktrees=new_worktrees,
+    )
+
+
 def removeWorktreeFromState(state: StateFile, name: str) -> StateFile:
     new_worktrees = {k: v for k, v in state.worktrees.items() if k != name}
     return StateFile(
@@ -73,15 +85,15 @@ def reconcileState(
         if info.get("path") in git_paths:
             new_worktrees[name] = info
 
-    # add untracked (worktrees in lj dir not in state)
+    # add untracked (worktrees in tl dir not in state)
     known_paths = {info.get("path") for info in new_worktrees.values()}
     repo_root = state.repo_root
-    lj_prefix = f"{repo_root}/{worktree_dir}/"
+    tl_prefix = f"{repo_root}/{worktree_dir}/"
 
     for wt in git_worktrees:
         wt_path = wt["worktree"]
-        if wt_path.startswith(lj_prefix) and wt_path not in known_paths:
-            name = wt_path.removeprefix(lj_prefix).split("/")[0]
+        if wt_path.startswith(tl_prefix) and wt_path not in known_paths:
+            name = wt_path.removeprefix(tl_prefix).split("/")[0]
             if name and name not in new_worktrees:
                 new_worktrees[name] = {
                     "branch": wt.get("branch", ""),

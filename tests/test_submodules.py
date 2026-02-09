@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lumberjack.submodules import fixSubmoduleGitdirs, hasSubmodules
+from timberline.submodules import fixSubmoduleGitdirs, hasSubmodules
 
 
 def test_hasSubmodules_false(tmp_path: Path):

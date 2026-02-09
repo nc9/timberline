@@ -4,36 +4,36 @@ import contextlib
 from datetime import UTC, datetime
 from pathlib import Path
 
-from lumberjack.git import (
+from timberline.git import (
     branchExists,
     getStatusShort,
     hasTrackedChanges,
     listWorktreesRaw,
     runGit,
 )
-from lumberjack.names import generateName
-from lumberjack.state import (
+from timberline.names import generateName
+from timberline.state import (
     addWorktreeToState,
     loadState,
     reconcileState,
     removeWorktreeFromState,
     saveState,
 )
-from lumberjack.types import LumberjackConfig, LumberjackError, WorktreeInfo
+from timberline.types import TimberlineConfig, TimberlineError, WorktreeInfo
 
 
-def getWorktreePath(repo_root: Path, config: LumberjackConfig, name: str) -> Path:
+def getWorktreePath(repo_root: Path, config: TimberlineConfig, name: str) -> Path:
     return repo_root / config.worktree_dir / name
 
 
-def resolveBranchName(config: LumberjackConfig, name: str, type_: str | None = None) -> str:
+def resolveBranchName(config: TimberlineConfig, name: str, type_: str | None = None) -> str:
     branch_type = type_ or config.default_type
     return config.branch_template.format(user=config.user, type=branch_type, name=name)
 
 
 def createWorktree(
     repo_root: Path,
-    config: LumberjackConfig,
+    config: TimberlineConfig,
     name: str | None = None,
     branch: str | None = None,
     base: str | None = None,
@@ -48,7 +48,7 @@ def createWorktree(
 
     wt_path = getWorktreePath(repo_root, config, name)
     if wt_path.exists():
-        raise LumberjackError(f"Worktree '{name}' already exists at {wt_path}")
+        raise TimberlineError(f"Worktree '{name}' already exists at {wt_path}")
 
     # resolve branch
     branch_type = type_ or config.default_type
@@ -59,7 +59,7 @@ def createWorktree(
 
     # check branch doesn't already exist
     if branchExists(branch, cwd=repo_root):
-        raise LumberjackError(f"Branch '{branch}' already exists")
+        raise TimberlineError(f"Branch '{branch}' already exists")
 
     # create worktree
     runGit("worktree", "add", "-b", branch, str(wt_path), base_branch, cwd=repo_root)
@@ -84,18 +84,18 @@ def createWorktree(
 
 def removeWorktree(
     repo_root: Path,
-    config: LumberjackConfig,
+    config: TimberlineConfig,
     name: str,
     force: bool = False,
     keep_branch: bool = False,
 ) -> None:
     wt_path = getWorktreePath(repo_root, config, name)
     if not wt_path.exists():
-        raise LumberjackError(f"Worktree '{name}' not found at {wt_path}")
+        raise TimberlineError(f"Worktree '{name}' not found at {wt_path}")
 
     # check dirty (tracked files only — untracked like CLAUDE.md are expected)
     if not force and hasTrackedChanges(wt_path):
-        raise LumberjackError(
+        raise TimberlineError(
             f"Worktree '{name}' has uncommitted changes. Use --force to override."
         )
 
@@ -111,7 +111,7 @@ def removeWorktree(
 
     # delete branch
     if branch and not keep_branch:
-        with contextlib.suppress(LumberjackError):
+        with contextlib.suppress(TimberlineError):
             runGit("branch", "-D", branch, cwd=repo_root)
 
     # update state
@@ -119,7 +119,7 @@ def removeWorktree(
     saveState(repo_root, config.worktree_dir, state)
 
 
-def listWorktrees(repo_root: Path, config: LumberjackConfig) -> list[WorktreeInfo]:
+def listWorktrees(repo_root: Path, config: TimberlineConfig) -> list[WorktreeInfo]:
     """List all managed worktrees, reconciling state with git."""
     state = loadState(repo_root, config.worktree_dir)
     git_wts = listWorktreesRaw(repo_root)
@@ -154,7 +154,7 @@ def listWorktrees(repo_root: Path, config: LumberjackConfig) -> list[WorktreeInf
     return sorted(worktrees, key=lambda w: w.name)
 
 
-def getWorktree(repo_root: Path, config: LumberjackConfig, name: str) -> WorktreeInfo | None:
+def getWorktree(repo_root: Path, config: TimberlineConfig, name: str) -> WorktreeInfo | None:
     for wt in listWorktrees(repo_root, config):
         if wt.name == name:
             return wt

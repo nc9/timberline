@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lumberjack.config import configExists, loadConfig, updateConfigField, writeConfig
-from lumberjack.types import LumberjackConfig, NamingScheme
+from timberline.config import configExists, loadConfig, updateConfigField, writeConfig
+from timberline.types import NamingScheme, TimberlineConfig
 
 
 def test_configExists_false(tmp_path: Path):
@@ -11,19 +11,19 @@ def test_configExists_false(tmp_path: Path):
 
 
 def test_configExists_true(tmp_path: Path):
-    (tmp_path / ".lumberjack.toml").write_text("[lumberjack]\n")
+    (tmp_path / ".timberline.toml").write_text("[timberline]\n")
     assert configExists(tmp_path)
 
 
 def test_loadConfig_defaults(tmp_path: Path):
     cfg = loadConfig(tmp_path)
-    assert cfg.worktree_dir == ".lj"
+    assert cfg.worktree_dir == ".tl"
     assert cfg.naming_scheme == NamingScheme.MINERALS
     assert cfg.init.auto_init is True
 
 
 def test_writeConfig_roundTrip(tmp_path: Path):
-    cfg = LumberjackConfig(user="nik", base_branch="develop", naming_scheme=NamingScheme.CITIES)
+    cfg = TimberlineConfig(user="nik", base_branch="develop", naming_scheme=NamingScheme.CITIES)
     writeConfig(tmp_path, cfg)
 
     loaded = loadConfig(tmp_path)
@@ -34,7 +34,7 @@ def test_writeConfig_roundTrip(tmp_path: Path):
 
 def test_writeConfig_partial_override(tmp_path: Path):
     # write full config, then load — ensure nested configs survive
-    cfg = LumberjackConfig(user="test")
+    cfg = TimberlineConfig(user="test")
     writeConfig(tmp_path, cfg)
 
     loaded = loadConfig(tmp_path)
@@ -43,7 +43,7 @@ def test_writeConfig_partial_override(tmp_path: Path):
 
 
 def test_updateConfigField(tmp_path: Path):
-    cfg = LumberjackConfig(user="old")
+    cfg = TimberlineConfig(user="old")
     writeConfig(tmp_path, cfg)
 
     updated = updateConfigField(tmp_path, "user", "new")

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from lumberjack.git import (
+from timberline.git import (
     branchExists,
     findRepoRoot,
     getAheadBehind,
@@ -13,9 +13,10 @@ from lumberjack.git import (
     getDefaultBranch,
     getStatusShort,
     listWorktreesRaw,
+    renameBranch,
     runGit,
 )
-from lumberjack.types import LumberjackError
+from timberline.types import TimberlineError
 
 
 def test_runGit_basic(tmp_git_repo: Path):
@@ -24,7 +25,7 @@ def test_runGit_basic(tmp_git_repo: Path):
 
 
 def test_runGit_fails_on_bad_command(tmp_git_repo: Path):
-    with pytest.raises(LumberjackError):
+    with pytest.raises(TimberlineError):
         runGit("nonexistent-command", cwd=tmp_git_repo)
 
 
@@ -41,7 +42,7 @@ def test_findRepoRoot_from_subdir(tmp_git_repo: Path):
 
 
 def test_findRepoRoot_from_worktree(tmp_git_repo: Path):
-    wt_dir = tmp_git_repo / ".lj" / "test-wt"
+    wt_dir = tmp_git_repo / ".tl" / "test-wt"
     subprocess.run(
         ["git", "worktree", "add", "-b", "test-branch", str(wt_dir)],
         cwd=tmp_git_repo,
@@ -73,7 +74,7 @@ def test_listWorktreesRaw(tmp_git_repo: Path):
 
 
 def test_listWorktreesRaw_with_worktree(tmp_git_repo: Path):
-    wt_dir = tmp_git_repo / ".lj" / "obsidian"
+    wt_dir = tmp_git_repo / ".tl" / "obsidian"
     subprocess.run(
         ["git", "worktree", "add", "-b", "feat/obsidian", str(wt_dir)],
         cwd=tmp_git_repo,
@@ -100,3 +101,16 @@ def test_getAheadBehind(tmp_git_repo: Path):
     ahead, behind = getAheadBehind("main", "main", tmp_git_repo)
     assert ahead == 0
     assert behind == 0
+
+
+def test_renameBranch(tmp_git_repo: Path):
+    subprocess.run(
+        ["git", "checkout", "-b", "old-branch"],
+        cwd=tmp_git_repo,
+        capture_output=True,
+        check=True,
+    )
+    renameBranch("old-branch", "new-branch", cwd=tmp_git_repo)
+    assert getCurrentBranch(tmp_git_repo) == "new-branch"
+    assert branchExists("new-branch", cwd=tmp_git_repo)
+    assert not branchExists("old-branch", cwd=tmp_git_repo)

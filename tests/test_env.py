@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lumberjack.env import copyEnvFiles, diffEnvFiles, discoverEnvFiles
-from lumberjack.types import EnvConfig
+from timberline.env import copyEnvFiles, diffEnvFiles, discoverEnvFiles
+from timberline.types import EnvConfig
 
 
 def test_discoverEnvFiles_basic(tmp_path: Path):
@@ -39,14 +39,14 @@ def test_discoverEnvFiles_depth_limit(tmp_path: Path):
     assert not any("e" in str(f) for f in files)
 
 
-def test_discoverEnvFiles_skip_lj(tmp_path: Path):
-    lj_dir = tmp_path / ".lj" / "worktree"
-    lj_dir.mkdir(parents=True)
-    (lj_dir / ".env").write_text("KEY=val")
+def test_discoverEnvFiles_skip_tl(tmp_path: Path):
+    tl_dir = tmp_path / ".tl" / "worktree"
+    tl_dir.mkdir(parents=True)
+    (tl_dir / ".env").write_text("KEY=val")
 
     config = EnvConfig()
     files = discoverEnvFiles(tmp_path, config)
-    assert not any(".lj" in str(f) for f in files)
+    assert not any(".tl" in str(f) for f in files)
 
 
 def test_copyEnvFiles(tmp_path: Path):

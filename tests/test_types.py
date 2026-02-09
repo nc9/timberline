@@ -1,16 +1,16 @@
 import pytest
 
-from lumberjack.types import (
+from timberline.types import (
     AgentConfig,
     AgentDef,
     BranchType,
     EnvConfig,
     InitConfig,
-    LumberjackConfig,
-    LumberjackError,
     NamingScheme,
     StateFile,
     SubmodulesConfig,
+    TimberlineConfig,
+    TimberlineError,
     WorktreeInfo,
 )
 
@@ -34,9 +34,9 @@ def test_branchType_values():
     assert BranchType.REFACTOR == "refactor"
 
 
-def test_lumberjackConfig_defaults():
-    cfg = LumberjackConfig()
-    assert cfg.worktree_dir == ".lj"
+def test_timberlineConfig_defaults():
+    cfg = TimberlineConfig()
+    assert cfg.worktree_dir == ".tl"
     assert cfg.branch_template == "{user}/{type}/{name}"
     assert cfg.user == ""
     assert cfg.default_type == "feature"
@@ -49,8 +49,8 @@ def test_lumberjackConfig_defaults():
     assert cfg.default_agent == "claude"
 
 
-def test_lumberjackConfig_frozen():
-    cfg = LumberjackConfig()
+def test_timberlineConfig_frozen():
+    cfg = TimberlineConfig()
     with pytest.raises(AttributeError):
         cfg.user = "changed"  # type: ignore[misc]
 
@@ -120,7 +120,7 @@ def test_stateFile_frozen():
         sf.version = 2  # type: ignore[misc]
 
 
-def test_lumberjackError():
-    err = LumberjackError("boom")
+def test_timberlineError():
+    err = TimberlineError("boom")
     assert str(err) == "boom"
     assert isinstance(err, Exception)

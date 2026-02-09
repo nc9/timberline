@@ -8,22 +8,22 @@ test: ## Run tests
 	uv run pytest -v
 
 lint: ## Lint + type check
-	uv run ruff check lumberjack/ tests/
-	uv run basedpyright lumberjack/
+	uv run ruff check timberline/ tests/
+	uv run basedpyright timberline/
 
 fmt: ## Format + fix imports
-	uv run ruff format lumberjack/ tests/
-	uv run ruff check --fix lumberjack/ tests/
+	uv run ruff format timberline/ tests/
+	uv run ruff check --fix timberline/ tests/
 
 check: fmt lint test ## Format, lint, type check, test
 
-link: dev ## Symlink lj to ~/.local/bin for testing
+link: dev ## Symlink tl to ~/.local/bin for testing
 	@mkdir -p $(HOME)/.local/bin
-	@ln -sf $(CURDIR)/.venv/bin/lj $(HOME)/.local/bin/lj
-	@echo "✓ lj linked to ~/.local/bin/lj"
+	@ln -sf $(CURDIR)/.venv/bin/tl $(HOME)/.local/bin/tl
+	@echo "✓ tl linked to ~/.local/bin/tl"
 
-unlink: ## Remove lj symlink
-	@rm -f $(HOME)/.local/bin/lj
-	@echo "✓ lj unlinked"
+unlink: ## Remove tl symlink
+	@rm -f $(HOME)/.local/bin/tl
+	@echo "✓ tl unlinked"
 
 .DEFAULT_GOAL := dev

@@ -4,10 +4,10 @@ import os
 import shutil
 from pathlib import Path
 
-from lumberjack.types import AgentDef, WorktreeInfo
+from timberline.types import AgentDef, WorktreeInfo
 
-_MARKER_START = "<!-- lumberjack:start -->"
-_MARKER_END = "<!-- lumberjack:end -->"
+_MARKER_START = "<!-- timberline:start -->"
+_MARKER_END = "<!-- timberline:end -->"
 
 KNOWN_AGENTS: dict[str, AgentDef] = {
     "claude": AgentDef(binary="claude", context_file="CLAUDE.md"),
@@ -32,11 +32,11 @@ def getAgentDef(name: str) -> AgentDef:
 
 def buildEnvVars(info: WorktreeInfo, repo_root: Path) -> dict[str, str]:
     return {
-        "LJ_WORKTREE": info.name,
-        "LJ_BRANCH": info.branch,
-        "LJ_BASE": info.base_branch,
-        "LJ_ROOT": str(repo_root),
-        "LJ_TYPE": info.type,
+        "TL_WORKTREE": info.name,
+        "TL_BRANCH": info.branch,
+        "TL_BASE": info.base_branch,
+        "TL_ROOT": str(repo_root),
+        "TL_TYPE": info.type,
     }
 
 
@@ -48,9 +48,9 @@ def buildContextBlock(
 
     return f"""{_MARKER_START}
 
-# Lumberjack Worktree Context
+# Timberline Worktree Context
 
-You are working in a **Lumberjack-managed git worktree**.
+You are working in a **Timberline-managed git worktree**.
 
 | Key         | Value                            |
 |-------------|----------------------------------|
@@ -68,10 +68,10 @@ You are working in a **Lumberjack-managed git worktree**.
 
 ## Useful Commands
 
-- `lj status` — see all worktrees and their git status
-- `lj sync` — rebase this worktree onto the latest base branch
-- `lj env sync` — refresh .env files from the main repo
-- `lj ls` — list all active worktrees
+- `tl status` — see all worktrees and their git status
+- `tl sync` — rebase this worktree onto the latest base branch
+- `tl env sync` — refresh .env files from the main repo
+- `tl ls` — list all active worktrees
 
 {_MARKER_END}"""
 

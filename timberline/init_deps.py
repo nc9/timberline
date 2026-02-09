@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
-from lumberjack.types import InitConfig
+from timberline.types import InitConfig
 
 # detection priority order
 _LOCKFILE_MAP: list[tuple[str, list[str]]] = [
@@ -39,7 +40,7 @@ def isDifferentEcosystem(cmd_a: list[str] | None, cmd_b: list[str] | None) -> bo
 
 def findProjectDirs(root: Path, max_depth: int = 3) -> list[Path]:
     """Find subdirectories that have their own package manager files."""
-    skip = {".lj", "node_modules", ".git", "__pycache__", ".venv", "dist"}
+    skip = {".tl", "node_modules", ".git", "__pycache__", ".venv", "dist"}
     results: list[Path] = []
 
     def _walk(path: Path, depth: int) -> None:
@@ -75,6 +76,52 @@ def _runCmd(cmd: list[str] | str, cwd: Path, shell: bool = False) -> tuple[str, 
         return desc, True
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
         return desc, False
+
+
+def _hasMakeTarget(project_dir: Path, target: str) -> bool:
+    makefile = project_dir / "Makefile"
+    if not makefile.exists():
+        return False
+    try:
+        content = makefile.read_text()
+    except OSError:
+        return False
+    return f"{target}:" in content
+
+
+def _hasPackageScript(project_dir: Path, script: str) -> str | None:
+    """Return runner command if package.json has script, else None."""
+    pkg = project_dir / "package.json"
+    if not pkg.exists():
+        return None
+    try:
+        data = json.loads(pkg.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    scripts = data.get("scripts", {})
+    if script not in scripts:
+        return None
+    has_bun = (project_dir / "bun.lock").exists() or (project_dir / "bun.lockb").exists()
+    runner = "bun run" if has_bun else "npm run"
+    return f"{runner} {script}"
+
+
+def detectPreLand(project_dir: Path) -> str | None:
+    # Makefile check target
+    if _hasMakeTarget(project_dir, "check"):
+        return "make check"
+    # package.json check script
+    pkg_check = _hasPackageScript(project_dir, "check")
+    if pkg_check:
+        return pkg_check
+    # fallback: Makefile test target
+    if _hasMakeTarget(project_dir, "test"):
+        return "make test"
+    # fallback: package.json test script
+    pkg_test = _hasPackageScript(project_dir, "test")
+    if pkg_test:
+        return pkg_test
+    return None
 
 
 def detectAndInstall(worktree_path: Path, config: InitConfig) -> list[tuple[str, bool]]:

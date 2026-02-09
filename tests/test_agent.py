@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lumberjack.agent import (
+from timberline.agent import (
     KNOWN_AGENTS,
     buildContextBlock,
     buildEnvVars,
@@ -13,7 +13,7 @@ from lumberjack.agent import (
     getAgentDef,
     injectAgentContext,
 )
-from lumberjack.types import WorktreeInfo
+from timberline.types import WorktreeInfo
 
 
 def _makeInfo(name: str = "obsidian") -> WorktreeInfo:
@@ -22,18 +22,18 @@ def _makeInfo(name: str = "obsidian") -> WorktreeInfo:
         branch=f"nik/feature/{name}",
         base_branch="main",
         type="feature",
-        path=f"/repo/.lj/{name}",
+        path=f"/repo/.tl/{name}",
     )
 
 
 def test_buildEnvVars():
     info = _makeInfo()
     env = buildEnvVars(info, Path("/repo"))
-    assert env["LJ_WORKTREE"] == "obsidian"
-    assert env["LJ_BRANCH"] == "nik/feature/obsidian"
-    assert env["LJ_BASE"] == "main"
-    assert env["LJ_ROOT"] == "/repo"
-    assert env["LJ_TYPE"] == "feature"
+    assert env["TL_WORKTREE"] == "obsidian"
+    assert env["TL_BRANCH"] == "nik/feature/obsidian"
+    assert env["TL_BASE"] == "main"
+    assert env["TL_ROOT"] == "/repo"
+    assert env["TL_TYPE"] == "feature"
 
 
 def test_buildContextBlock():
@@ -44,8 +44,8 @@ def test_buildContextBlock():
     assert "nik/feature/obsidian" in block
     assert "alpha" in block
     assert "beta" in block
-    assert "<!-- lumberjack:start -->" in block
-    assert "<!-- lumberjack:end -->" in block
+    assert "<!-- timberline:start -->" in block
+    assert "<!-- timberline:end -->" in block
 
 
 def test_injectAgentContext_new_file(tmp_path: Path):
@@ -53,7 +53,7 @@ def test_injectAgentContext_new_file(tmp_path: Path):
     agent = KNOWN_AGENTS["claude"]
     injectAgentContext(agent, tmp_path, info, [info], Path("/repo"))
     content = (tmp_path / "CLAUDE.md").read_text()
-    assert "<!-- lumberjack:start -->" in content
+    assert "<!-- timberline:start -->" in content
     assert "obsidian" in content
 
 
@@ -64,12 +64,12 @@ def test_injectAgentContext_existing_without_markers(tmp_path: Path):
     injectAgentContext(agent, tmp_path, info, [info], Path("/repo"))
     content = (tmp_path / "CLAUDE.md").read_text()
     assert "# Existing content" in content
-    assert "<!-- lumberjack:start -->" in content
+    assert "<!-- timberline:start -->" in content
 
 
 def test_injectAgentContext_replaces_existing_markers(tmp_path: Path):
     (tmp_path / "CLAUDE.md").write_text(
-        "# Header\n<!-- lumberjack:start -->\nold content\n<!-- lumberjack:end -->\n# Footer\n"
+        "# Header\n<!-- timberline:start -->\nold content\n<!-- timberline:end -->\n# Footer\n"
     )
     info = _makeInfo()
     agent = KNOWN_AGENTS["claude"]
@@ -103,7 +103,7 @@ def test_getAgentDef_unknown():
 
 
 def test_detectInstalledAgents_none():
-    with patch("lumberjack.agent.shutil.which", return_value=None):
+    with patch("timberline.agent.shutil.which", return_value=None):
         assert detectInstalledAgents() == []
 
 
@@ -111,6 +111,6 @@ def test_detectInstalledAgents_some():
     def mock_which(binary: str) -> str | None:
         return "/usr/bin/claude" if binary == "claude" else None
 
-    with patch("lumberjack.agent.shutil.which", side_effect=mock_which):
+    with patch("timberline.agent.shutil.which", side_effect=mock_which):
         result = detectInstalledAgents()
         assert result == ["claude"]

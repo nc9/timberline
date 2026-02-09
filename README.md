@@ -88,6 +88,17 @@ tlcd auth-refactor              # cd directly
 
 Each worktree gets its own branch (from `branch_template`), dependencies installed via `auto_init`, and `.env` files copied from the main repo.
 
+## Sync with Base Branch
+
+```bash
+tl sync                     # rebase current worktree onto base
+tl sync auth-refactor       # rebase specific worktree
+tl sync --all               # rebase all worktrees
+tl sync --merge             # merge instead of rebase
+```
+
+Fetches all remotes, then rebases (default) or merges onto `origin/{base_branch}`. Each worktree tracks its own base branch from creation — no hardcoded "main".
+
 ## Land a PR
 
 ```bash

@@ -14,6 +14,7 @@ dependencies = [
 
 [project.scripts]
 tl = "timberline.cli:app"
+timberline = "timberline.cli:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -22,8 +23,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["timberline"]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=8.0",
     "pytest-tmp-files>=0.0.2",
     "basedpyright>=1.20",

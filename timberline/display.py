@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from rich.console import Console
 from rich.table import Table
 
-from timberline.types import TimberlineConfig, WorktreeInfo
+from timberline.models import TimberlineConfig, WorktreeInfo
 
 _console = Console(stderr=True)
 _stdout = Console()

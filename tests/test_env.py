@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from timberline.env import copyEnvFiles, diffEnvFiles, discoverEnvFiles
-from timberline.types import EnvConfig
+from timberline.models import EnvConfig
 
 
 def test_discoverEnvFiles_basic(tmp_path: Path):

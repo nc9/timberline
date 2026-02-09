@@ -5,7 +5,7 @@ import shutil
 from fnmatch import fnmatch
 from pathlib import Path
 
-from timberline.types import EnvConfig
+from timberline.models import EnvConfig
 
 _SKIP_DIRS = {".tl", "node_modules", ".git", "__pycache__", ".venv", "dist"}
 

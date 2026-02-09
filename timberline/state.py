@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from timberline.types import StateFile, WorktreeInfo
+from timberline.models import StateFile, WorktreeInfo
 
 STATE_FILENAME = ".tl-state.json"
 

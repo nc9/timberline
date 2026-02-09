@@ -16,7 +16,7 @@ from timberline.git import (
     renameBranch,
     runGit,
 )
-from timberline.types import TimberlineError
+from timberline.models import TimberlineError
 
 
 def test_runGit_basic(tmp_git_repo: Path):

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import tomli_w
 
-from timberline.types import (
+from timberline.models import (
     AgentConfig,
     EnvConfig,
     InitConfig,

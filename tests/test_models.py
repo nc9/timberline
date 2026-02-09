@@ -1,6 +1,6 @@
 import pytest
 
-from timberline.types import (
+from timberline.models import (
     AgentConfig,
     AgentDef,
     BranchType,

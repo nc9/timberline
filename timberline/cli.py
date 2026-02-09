@@ -43,6 +43,12 @@ from timberline.git import (
     runGit,
 )
 from timberline.init_deps import detectAndInstall, detectInstaller, detectPreLand
+from timberline.models import (
+    NamingScheme,
+    TimberlineConfig,
+    TimberlineError,
+    WorktreeInfo,
+)
 from timberline.shell import (
     detectShell,
     generateShellInit,
@@ -51,12 +57,6 @@ from timberline.shell import (
 )
 from timberline.state import loadState, saveState, updateWorktreeBranch
 from timberline.submodules import hasSubmodules, initSubmodules
-from timberline.types import (
-    NamingScheme,
-    TimberlineConfig,
-    TimberlineError,
-    WorktreeInfo,
-)
 from timberline.worktree import (
     createWorktree,
     getWorktree,

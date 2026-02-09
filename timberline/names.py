@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 
-from timberline.types import NamingScheme, TimberlineError
+from timberline.models import NamingScheme, TimberlineError
 
 MINERALS = [
     "obsidian",

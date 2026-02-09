@@ -4,7 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from timberline.types import InitConfig
+from timberline.models import InitConfig
 
 # detection priority order
 _LOCKFILE_MAP: list[tuple[str, list[str]]] = [

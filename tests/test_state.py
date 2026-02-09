@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from timberline.models import StateFile, WorktreeInfo
 from timberline.state import (
     addWorktreeToState,
     loadState,
@@ -10,7 +11,6 @@ from timberline.state import (
     saveState,
     updateWorktreeBranch,
 )
-from timberline.types import StateFile, WorktreeInfo
 
 
 def test_loadState_missing(tmp_path: Path):

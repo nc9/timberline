@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from timberline.config import configExists, loadConfig, updateConfigField, writeConfig
-from timberline.types import NamingScheme, TimberlineConfig
+from timberline.models import NamingScheme, TimberlineConfig
 
 
 def test_configExists_false(tmp_path: Path):

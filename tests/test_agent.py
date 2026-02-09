@@ -13,7 +13,7 @@ from timberline.agent import (
     getAgentDef,
     injectAgentContext,
 )
-from timberline.types import WorktreeInfo
+from timberline.models import WorktreeInfo
 
 
 def _makeInfo(name: str = "obsidian") -> WorktreeInfo:

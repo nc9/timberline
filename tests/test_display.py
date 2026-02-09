@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from timberline.display import formatAge, printWorktreeTable
-from timberline.types import WorktreeInfo
+from timberline.models import WorktreeInfo
 
 
 def test_formatAge_just_now():

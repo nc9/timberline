@@ -4,7 +4,7 @@ import os
 import shutil
 from pathlib import Path
 
-from timberline.types import AgentDef, WorktreeInfo
+from timberline.models import AgentDef, WorktreeInfo
 
 _MARKER_START = "<!-- timberline:start -->"
 _MARKER_END = "<!-- timberline:end -->"

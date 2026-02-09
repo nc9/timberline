@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from timberline.models import NamingScheme
 from timberline.names import ADJECTIVES, CITIES, MINERALS, generateName
-from timberline.types import NamingScheme
 
 
 def test_generateName_minerals():

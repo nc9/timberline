@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from timberline.types import TimberlineError
+from timberline.models import TimberlineError
 
 
 def runGit(*args: str, cwd: Path | None = None) -> str:

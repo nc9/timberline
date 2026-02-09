@@ -11,6 +11,7 @@ from timberline.git import (
     listWorktreesRaw,
     runGit,
 )
+from timberline.models import TimberlineConfig, TimberlineError, WorktreeInfo
 from timberline.names import generateName
 from timberline.state import (
     addWorktreeToState,
@@ -19,7 +20,6 @@ from timberline.state import (
     removeWorktreeFromState,
     saveState,
 )
-from timberline.types import TimberlineConfig, TimberlineError, WorktreeInfo
 
 
 def getWorktreePath(repo_root: Path, config: TimberlineConfig, name: str) -> Path:

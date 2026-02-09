@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from timberline.config import writeConfig
-from timberline.types import TimberlineConfig, TimberlineError
+from timberline.models import TimberlineConfig, TimberlineError
 from timberline.worktree import (
     createWorktree,
     getWorktree,

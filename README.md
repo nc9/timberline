@@ -32,9 +32,9 @@ pip install timberline
 uv tool upgrade timberline
 ```
 
-## Install
+## Setup
 
-Setup shell aliases 
+Setup shell aliases
 
 ```bash
 tl install

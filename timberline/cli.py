@@ -227,14 +227,15 @@ def init(
 
     # update .gitignore
     gitignore = repo_root / ".gitignore"
-    wt_dir = config.worktree_dir + "/"
+    entries = [config.worktree_dir + "/", ".tl/"]
     if gitignore.exists():
         content = gitignore.read_text()
-        if wt_dir not in content:
-            gitignore.write_text(content.rstrip() + f"\n{wt_dir}\n")
+        added = [e for e in entries if e not in content]
+        if added:
+            gitignore.write_text(content.rstrip() + "\n" + "\n".join(added) + "\n")
             printSuccess("Updated .gitignore")
     else:
-        gitignore.write_text(f"{wt_dir}\n")
+        gitignore.write_text("\n".join(entries) + "\n")
         printSuccess("Created .gitignore")
 
     printSuccess("Ready — run `tl new` to create your first worktree")

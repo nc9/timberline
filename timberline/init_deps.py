@@ -6,7 +6,21 @@ from pathlib import Path
 
 from timberline.models import InitConfig
 
-# detection priority order
+# command → ecosystem mapping
+_ECOSYSTEM: dict[str, str] = {
+    "bun": "js",
+    "npm": "js",
+    "yarn": "js",
+    "pnpm": "js",
+    "uv": "python",
+    "pip": "python",
+    "cargo": "rust",
+    "go": "go",
+    "composer": "php",
+    "bundle": "ruby",
+}
+
+# detection priority order — lockfiles before project files, grouped by ecosystem
 _LOCKFILE_MAP: list[tuple[str, list[str]]] = [
     ("bun.lock", ["bun", "install"]),
     ("bun.lockb", ["bun", "install"]),
@@ -17,10 +31,15 @@ _LOCKFILE_MAP: list[tuple[str, list[str]]] = [
     ("uv.lock", ["uv", "sync"]),
     ("pyproject.toml", ["uv", "sync"]),
     ("requirements.txt", ["uv", "pip", "install", "-r", "requirements.txt"]),
+    ("Cargo.lock", ["cargo", "fetch"]),
+    ("Cargo.toml", ["cargo", "fetch"]),
+    ("go.sum", ["go", "mod", "download"]),
+    ("go.mod", ["go", "mod", "download"]),
+    ("composer.lock", ["composer", "install"]),
+    ("composer.json", ["composer", "install"]),
+    ("Gemfile.lock", ["bundle", "install"]),
+    ("Gemfile", ["bundle", "install"]),
 ]
-
-_JS_COMMANDS = {"bun", "npm", "yarn", "pnpm"}
-_PY_COMMANDS = {"uv", "pip", "python"}
 
 
 def detectInstaller(project_dir: Path) -> list[str] | None:
@@ -33,14 +52,26 @@ def detectInstaller(project_dir: Path) -> list[str] | None:
 def isDifferentEcosystem(cmd_a: list[str] | None, cmd_b: list[str] | None) -> bool:
     if not cmd_a or not cmd_b:
         return True
-    a_is_js = cmd_a[0] in _JS_COMMANDS
-    b_is_js = cmd_b[0] in _JS_COMMANDS
-    return a_is_js != b_is_js
+    eco_a = _ECOSYSTEM.get(cmd_a[0])
+    eco_b = _ECOSYSTEM.get(cmd_b[0])
+    if eco_a is None or eco_b is None:
+        return True
+    return eco_a != eco_b
 
 
 def findProjectDirs(root: Path, max_depth: int = 3) -> list[Path]:
     """Find subdirectories that have their own package manager files."""
-    skip = {".tl", "node_modules", ".git", "__pycache__", ".venv", "dist"}
+    skip = {
+        ".tl",
+        "node_modules",
+        ".git",
+        "__pycache__",
+        ".venv",
+        "dist",
+        "target",
+        "vendor",
+        ".bundle",
+    }
     results: list[Path] = []
 
     def _walk(path: Path, depth: int) -> None:
@@ -89,31 +120,45 @@ def _hasMakeTarget(project_dir: Path, target: str) -> bool:
     return f"{target}:" in content
 
 
+def _hasJsonScript(json_file: Path, script: str) -> bool:
+    """Check if a JSON file (package.json, composer.json) has a script."""
+    if not json_file.exists():
+        return False
+    try:
+        data = json.loads(json_file.read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    return script in data.get("scripts", {})
+
+
 def _hasPackageScript(project_dir: Path, script: str) -> str | None:
     """Return runner command if package.json has script, else None."""
-    pkg = project_dir / "package.json"
-    if not pkg.exists():
-        return None
-    try:
-        data = json.loads(pkg.read_text())
-    except (OSError, json.JSONDecodeError):
-        return None
-    scripts = data.get("scripts", {})
-    if script not in scripts:
+    if not _hasJsonScript(project_dir / "package.json", script):
         return None
     has_bun = (project_dir / "bun.lock").exists() or (project_dir / "bun.lockb").exists()
     runner = "bun run" if has_bun else "npm run"
     return f"{runner} {script}"
 
 
+def _hasComposerScript(project_dir: Path, script: str) -> str | None:
+    """Return composer run-script command if composer.json has script, else None."""
+    if not _hasJsonScript(project_dir / "composer.json", script):
+        return None
+    return f"composer run-script {script}"
+
+
 def detectPreLand(project_dir: Path) -> str | None:
-    # Makefile check target
+    # Makefile check target (highest priority — explicit user config)
     if _hasMakeTarget(project_dir, "check"):
         return "make check"
     # package.json check script
     pkg_check = _hasPackageScript(project_dir, "check")
     if pkg_check:
         return pkg_check
+    # composer.json check script
+    composer_check = _hasComposerScript(project_dir, "check")
+    if composer_check:
+        return composer_check
     # fallback: Makefile test target
     if _hasMakeTarget(project_dir, "test"):
         return "make test"
@@ -121,6 +166,16 @@ def detectPreLand(project_dir: Path) -> str | None:
     pkg_test = _hasPackageScript(project_dir, "test")
     if pkg_test:
         return pkg_test
+    # fallback: composer.json test script
+    composer_test = _hasComposerScript(project_dir, "test")
+    if composer_test:
+        return composer_test
+    # fallback: cargo test
+    if (project_dir / "Cargo.toml").exists():
+        return "cargo test"
+    # fallback: go test
+    if (project_dir / "go.mod").exists():
+        return "go test ./..."
     return None
 
 

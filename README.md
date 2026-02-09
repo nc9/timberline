@@ -6,7 +6,7 @@ Git worktree manager for parallel coding agent development.
 
 - **Auto-launch coding agents** — spawn Claude, Codex, OpenCode, or Aider directly into a worktree (`tl new --agent`)
 - **Agent context injection** — auto-injects worktree metadata (branch, base, sibling worktrees) into agent config files (CLAUDE.md, AGENTS.md)
-- **Auto-init dependencies** — detects & installs via bun/npm/pnpm/yarn/uv/pip/cargo on worktree creation
+- **Auto-init dependencies** — detects & installs via bun/npm/pnpm/yarn/uv/pip/cargo/go/composer/bundle on worktree creation
 - **Auto-copy .env files** — glob-based discovery with include/exclude patterns, sync & diff commands
 - **Auto-init submodules** — recursive submodule setup on worktree creation
 - **Shell integration** — `tlcd` to cd into worktrees, `tl-prompt` for PS1, auto-install for bash/zsh/fish
@@ -60,7 +60,7 @@ Run `tl init` inside any git repo to create `.timberline.toml`. The wizard auto-
 
 - **Branch prefix** from your git user
 - **Base branch** (main/master/develop)
-- **Package manager** (bun, npm, pnpm, yarn, uv, pip, cargo, etc.) for dependency install
+- **Package manager** (bun, npm, pnpm, yarn, uv, pip, cargo, go, composer, bundle) for dependency install
 - **Pre-land checks** (Makefile targets, npm scripts like `lint`, `test`, `check`)
 - **Default agent** (claude, codex, opencode, aider) if installed
 

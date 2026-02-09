@@ -7,7 +7,17 @@ from pathlib import Path
 
 from timberline.models import EnvConfig
 
-_SKIP_DIRS = {".tl", "node_modules", ".git", "__pycache__", ".venv", "dist"}
+_SKIP_DIRS = {
+    ".tl",
+    "node_modules",
+    ".git",
+    "__pycache__",
+    ".venv",
+    "dist",
+    "target",
+    "vendor",
+    ".bundle",
+}
 
 
 def discoverEnvFiles(repo_root: Path, config: EnvConfig) -> list[Path]:

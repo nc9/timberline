@@ -6,6 +6,7 @@ default_type = "feature"
 base_branch = "main"
 naming_scheme = "minerals"
 default_agent = "claude"
+pre_land = "make check"
 
 [timberline.init]
 init_command = "uv sync"

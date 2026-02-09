@@ -51,6 +51,7 @@ class AgentDef:
 class AgentConfig:
     auto_launch: bool = False
     inject_context: bool = True
+    context_file: str | None = None
 
 
 @dataclass(frozen=True)

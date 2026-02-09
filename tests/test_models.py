@@ -77,6 +77,13 @@ def test_submodulesConfig_frozen():
         sc.auto_init = False  # type: ignore[misc]
 
 
+def test_agentConfig_defaults():
+    ac = AgentConfig()
+    assert ac.auto_launch is False
+    assert ac.inject_context is True
+    assert ac.context_file is None
+
+
 def test_agentConfig_frozen():
     ac = AgentConfig()
     with pytest.raises(AttributeError):

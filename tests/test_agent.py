@@ -3,15 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from timberline.agent import (
+    DEFAULT_CONTEXT_FILE,
     KNOWN_AGENTS,
     buildContextBlock,
     buildEnvVars,
     detectInstalledAgents,
     getAgentDef,
     injectAgentContext,
+    validateAgentBinary,
 )
 from timberline.models import WorktreeInfo
 
@@ -97,9 +97,42 @@ def test_getAgentDef_known():
     assert agent.context_file == "CLAUDE.md"
 
 
-def test_getAgentDef_unknown():
-    with pytest.raises(KeyError, match="Unknown agent"):
-        getAgentDef("nonexistent")
+def test_getAgentDef_unknown_returns_default():
+    agent = getAgentDef("cc")
+    assert agent.binary == "cc"
+    assert agent.context_file == DEFAULT_CONTEXT_FILE
+
+
+def test_getAgentDef_unknown_with_override():
+    agent = getAgentDef("z", context_file_override="Z.md")
+    assert agent.binary == "z"
+    assert agent.context_file == "Z.md"
+
+
+def test_getAgentDef_known_with_override():
+    agent = getAgentDef("claude", context_file_override="CUSTOM.md")
+    assert agent.binary == "claude"
+    assert agent.context_file == "CUSTOM.md"
+
+
+def test_getAgentDef_known_no_override():
+    agent = getAgentDef("claude")
+    assert agent.context_file == "CLAUDE.md"
+
+
+def test_validateAgentBinary_known_found():
+    with patch("timberline.agent.shutil.which", return_value="/usr/bin/claude"):
+        assert validateAgentBinary("claude") == "/usr/bin/claude"
+
+
+def test_validateAgentBinary_unknown_found():
+    with patch("timberline.agent.shutil.which", return_value="/usr/bin/cc"):
+        assert validateAgentBinary("cc") == "/usr/bin/cc"
+
+
+def test_validateAgentBinary_not_found():
+    with patch("timberline.agent.shutil.which", return_value=None):
+        assert validateAgentBinary("nonexistent") is None
 
 
 def test_detectInstalledAgents_none():

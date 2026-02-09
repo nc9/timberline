@@ -83,6 +83,7 @@ def _parseConfig(data: dict) -> TimberlineConfig:
         agent=AgentConfig(
             auto_launch=agent_data.get("auto_launch", False),
             inject_context=agent_data.get("inject_context", True),
+            context_file=agent_data.get("context_file"),
         ),
     )
 
@@ -128,10 +129,13 @@ def _serializeConfig(config: TimberlineConfig) -> dict:
         "recursive": config.submodules.recursive,
     }
 
-    tl["agent"] = {
+    agent_dict: dict = {
         "auto_launch": config.agent.auto_launch,
         "inject_context": config.agent.inject_context,
     }
+    if config.agent.context_file:
+        agent_dict["context_file"] = config.agent.context_file
+    tl["agent"] = agent_dict
 
     return {"timberline": tl}
 

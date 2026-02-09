@@ -9,6 +9,8 @@ from timberline.models import AgentDef, WorktreeInfo
 _MARKER_START = "<!-- timberline:start -->"
 _MARKER_END = "<!-- timberline:end -->"
 
+DEFAULT_CONTEXT_FILE = "AGENTS.md"
+
 KNOWN_AGENTS: dict[str, AgentDef] = {
     "claude": AgentDef(binary="claude", context_file="CLAUDE.md"),
     "codex": AgentDef(binary="codex", context_file="AGENTS.md"),
@@ -22,12 +24,24 @@ def detectInstalledAgents() -> list[str]:
     return [name for name, defn in KNOWN_AGENTS.items() if shutil.which(defn.binary)]
 
 
-def getAgentDef(name: str) -> AgentDef:
-    """Lookup agent definition by name. Raises KeyError if unknown."""
-    if name not in KNOWN_AGENTS:
-        msg = f"Unknown agent '{name}'. Known: {', '.join(KNOWN_AGENTS)}"
-        raise KeyError(msg)
-    return KNOWN_AGENTS[name]
+def getAgentDef(name: str, context_file_override: str | None = None) -> AgentDef:
+    """Lookup agent definition by name. Unknown agents use DEFAULT_CONTEXT_FILE."""
+    if name in KNOWN_AGENTS:
+        defn = KNOWN_AGENTS[name]
+        if context_file_override:
+            return AgentDef(binary=defn.binary, context_file=context_file_override)
+        return defn
+    return AgentDef(
+        binary=name,
+        context_file=context_file_override or DEFAULT_CONTEXT_FILE,
+    )
+
+
+def validateAgentBinary(name: str) -> str | None:
+    """Check if agent binary exists on PATH. Returns path or None."""
+    if name in KNOWN_AGENTS:
+        return shutil.which(KNOWN_AGENTS[name].binary)
+    return shutil.which(name)
 
 
 def buildEnvVars(info: WorktreeInfo, repo_root: Path) -> dict[str, str]:

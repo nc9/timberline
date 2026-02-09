@@ -14,6 +14,7 @@ from timberline.agent import (
     getAgentDef,
     injectAgentContext,
     launchAgent,
+    validateAgentBinary,
 )
 from timberline.config import (
     configExists,
@@ -194,10 +195,20 @@ def init(
             default_agent = installed[0]
             printSuccess(f"Detected coding agent: {default_agent}")
         else:
+            choices = [*installed, "custom"]
             printSuccess(f"Detected coding agents: {', '.join(installed)}")
-            default_agent = typer.prompt("Default agent", default=installed[0], type=str)
+            default_agent = typer.prompt(
+                f"Default agent ({', '.join(choices)})", default=installed[0], type=str
+            )
+            if default_agent == "custom":
+                default_agent = typer.prompt("Agent binary name")
+                if not validateAgentBinary(default_agent):
+                    printWarning(f"'{default_agent}' not found on PATH (continuing anyway)")
     else:
         printWarning("No known coding agents found on PATH")
+        default_agent = typer.prompt("Agent binary name", default="claude", type=str)
+        if not validateAgentBinary(default_agent):
+            printWarning(f"'{default_agent}' not found on PATH (continuing anyway)")
 
     # detect pre-land checks
     pre_land = detectPreLand(repo_root)
@@ -291,7 +302,7 @@ def new_cmd(
 
     # inject agent context file
     if config.agent.inject_context:
-        agent_def = getAgentDef(config.default_agent)
+        agent_def = getAgentDef(config.default_agent, config.agent.context_file)
         all_wts = listWorktrees(repo_root, config)
         injectAgentContext(agent_def, wt_path, info, all_wts, repo_root)
         steps.append(f"Injected {agent_def.context_file} context")
@@ -303,7 +314,7 @@ def new_cmd(
 
     # launch agent
     if agent or config.agent.auto_launch:
-        agent_def = getAgentDef(config.default_agent)
+        agent_def = getAgentDef(config.default_agent, config.agent.context_file)
         env_vars = buildEnvVars(info, repo_root)
         launchAgent(agent_def, wt_path, env_vars)
 
@@ -498,7 +509,7 @@ def agent_cmd(
         return
 
     wt = _resolveWorktree(repo_root, config, name)
-    agent_def = getAgentDef(config.default_agent)
+    agent_def = getAgentDef(config.default_agent, config.agent.context_file)
     env_vars = buildEnvVars(wt, repo_root)
     launchAgent(agent_def, Path(wt.path), env_vars)
 

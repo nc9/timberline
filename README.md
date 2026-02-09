@@ -2,6 +2,20 @@
 
 Git worktree manager for parallel coding agent development.
 
+## Features
+
+- **Auto-launch coding agents** — spawn Claude, Codex, OpenCode, or Aider directly into a worktree (`tl new --agent`)
+- **Agent context injection** — auto-injects worktree metadata (branch, base, sibling worktrees) into agent config files (CLAUDE.md, AGENTS.md)
+- **Auto-init dependencies** — detects & installs via bun/npm/pnpm/yarn/uv/pip/cargo on worktree creation
+- **Auto-copy .env files** — glob-based discovery with include/exclude patterns, sync & diff commands
+- **Auto-init submodules** — recursive submodule setup on worktree creation
+- **Shell integration** — `tlcd` to cd into worktrees, `tl-prompt` for PS1, auto-install for bash/zsh/fish
+- **Creative naming schemes** — minerals, cities, or compound names for auto-named worktrees
+- **Branch templates** — configurable `{user}/{type}/{name}` patterns for consistent naming
+- **Land workflow** — pre-land checks → push → PR creation in one command
+- **Multi-worktree status** — git status, ahead/behind tracking across all worktrees
+- **Sync all worktrees** — rebase or merge all worktrees on latest base branch
+
 ## Install
 
 ```bash
@@ -12,15 +26,31 @@ uv tool install timberline
 pip install timberline
 ```
 
+## Upgrade
+
+```bash
+uv tool upgrade timberline
+```
+
+## Install
+
+Setup shell aliases 
+
+```bash
+tl install
+```
+
 ## Quick Start
 
 ```bash
 cd your-repo
-tl init --defaults          # create .timberline.toml
+tl init                     # create .timberline.toml
 tl new auth-refactor        # create worktree + branch
 tl new --type fix           # auto-named fix worktree
 tl ls                       # list all worktrees
 cd $(tl cd auth-refactor)   # jump into worktree
+tlcd auth-refactor          # jump into worktree (shell aliases installed)
+tl land                     # commit, run checks and push pr
 tl rm auth-refactor         # clean up
 ```
 

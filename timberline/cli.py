@@ -20,10 +20,11 @@ from timberline.config import (
     configExists,
     loadConfig,
     updateConfigField,
-    writeConfig,
+    writeInitConfig,
 )
 from timberline.display import (
-    printConfig,
+    printConfigTable,
+    printConfigToml,
     printCreateSummary,
     printError,
     printStatusList,
@@ -45,6 +46,7 @@ from timberline.git import (
 )
 from timberline.init_deps import detectAndInstall, detectInstaller, detectPreLand
 from timberline.models import (
+    InitConfig,
     NamingScheme,
     TimberlineConfig,
     TimberlineError,
@@ -228,12 +230,10 @@ def init(
         naming_scheme=naming,
         default_agent=default_agent,
         pre_land=pre_land,
-        init=default_cfg.init
-        if not init_command
-        else default_cfg.init.__class__(init_command=init_command, auto_init=True, post_init=[]),
+        init=InitConfig(init_command=init_command) if init_command else InitConfig(),
     )
 
-    writeConfig(repo_root, config)
+    writeInitConfig(repo_root, config)
     printSuccess("Created .timberline.toml")
 
     # update .gitignore
@@ -740,11 +740,16 @@ def clean(
 
 
 @config_app.command("show")
-def config_show_cmd() -> None:
+def config_show_cmd(
+    format_: Annotated[str, typer.Option("--format", "-f", help="Output: table or toml")] = "table",
+) -> None:
     """Show resolved configuration."""
     repo_root = _resolveRoot()
     config = _loadCfg(repo_root)
-    printConfig(config)
+    if format_ == "toml":
+        printConfigToml(config)
+    else:
+        printConfigTable(config)
 
 
 @config_app.command("edit")

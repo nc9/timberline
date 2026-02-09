@@ -247,3 +247,25 @@ def test_init_detects_pre_land(repo_dir: Path):
     with open(repo_dir / ".timberline.toml", "rb") as f:
         data = tomllib.load(f)
     assert data["timberline"]["pre_land"] == "make check"
+
+
+def test_config_show_toml(repo_dir: Path):
+    runner.invoke(app, ["init", "--defaults"])
+    result = runner.invoke(app, ["config", "show", "--format", "toml"])
+    assert result.exit_code == 0
+    assert "[timberline]" in result.output
+
+
+def test_config_set_dotNotation(repo_dir: Path):
+    runner.invoke(app, ["init", "--defaults"])
+    result = runner.invoke(app, ["config", "set", "env.auto_copy", "false"])
+    assert result.exit_code == 0
+    assert "env.auto_copy" in result.output
+
+
+def test_init_writes_commented_config(repo_dir: Path):
+    result = runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    assert result.exit_code == 0
+    content = (repo_dir / ".timberline.toml").read_text()
+    # should have comments for default values
+    assert "# worktree_dir" in content or "# default_type" in content

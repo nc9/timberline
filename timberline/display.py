@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from enum import StrEnum
 
 from rich.console import Console
 from rich.table import Table
+from rich.tree import Tree
 
+from timberline.config import _buildTomlDocument
 from timberline.models import TimberlineConfig, WorktreeInfo
 
 _console = Console(stderr=True)
@@ -77,16 +80,51 @@ def printCreateSummary(info: WorktreeInfo, steps: list[str]) -> None:
     _console.print()
 
 
-def printConfig(config: TimberlineConfig) -> None:
-    _console.print("[bold]Timberline Config[/bold]")
-    _console.print(f"  worktree_dir:    {config.worktree_dir}")
-    _console.print(f"  branch_template: {config.branch_template}")
-    _console.print(f"  user:            {config.user}")
-    _console.print(f"  default_type:    {config.default_type}")
-    _console.print(f"  base_branch:     {config.base_branch}")
-    _console.print(f"  naming_scheme:   {config.naming_scheme.value}")
-    _console.print(f"  init.auto_init:  {config.init.auto_init}")
-    _console.print(f"  env.auto_copy:   {config.env.auto_copy}")
+def printConfigTable(config: TimberlineConfig) -> None:
+    """Rich tree view with field descriptions from schema."""
+    tree = Tree("[bold]Timberline Config[/bold]")
+
+    nested = {"init", "env", "submodules", "agent"}
+    for name, field_info in TimberlineConfig.model_fields.items():
+        if name in nested:
+            continue
+        val = getattr(config, name)
+        if val is None:
+            continue
+        val_str = val.value if isinstance(val, StrEnum) else str(val)
+        desc = field_info.description
+        label = f"{name}: [cyan]{val_str}[/cyan]"
+        if desc:
+            label += f"  [dim]# {desc}[/dim]"
+        tree.add(label)
+
+    for section_name in nested:
+        sub_config = getattr(config, section_name)
+        sub_tree = tree.add(f"[bold]{section_name}[/bold]")
+        for name, field_info in sub_config.__class__.model_fields.items():
+            val = getattr(sub_config, name)
+            if val is None:
+                continue
+            val_str = str(val)
+            desc = field_info.description
+            label = f"{name}: [cyan]{val_str}[/cyan]"
+            if desc:
+                label += f"  [dim]# {desc}[/dim]"
+            sub_tree.add(label)
+
+    _console.print(tree)
+
+
+def printConfigToml(config: TimberlineConfig) -> None:
+    """Print config as commented TOML to stdout."""
+    from tomlkit import dumps
+
+    doc = _buildTomlDocument(config)
+    print(dumps(doc), end="")
+
+
+# backward compat alias
+printConfig = printConfigTable
 
 
 def printError(msg: str) -> None:

@@ -1,4 +1,7 @@
+import warnings
+
 import pytest
+from pydantic import ValidationError
 
 from timberline.models import (
     AgentConfig,
@@ -51,7 +54,7 @@ def test_timberlineConfig_defaults():
 
 def test_timberlineConfig_frozen():
     cfg = TimberlineConfig()
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValidationError):
         cfg.user = "changed"  # type: ignore[misc]
 
 
@@ -73,7 +76,7 @@ def test_envConfig_defaults():
 
 def test_submodulesConfig_frozen():
     sc = SubmodulesConfig()
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValidationError):
         sc.auto_init = False  # type: ignore[misc]
 
 
@@ -86,7 +89,7 @@ def test_agentConfig_defaults():
 
 def test_agentConfig_frozen():
     ac = AgentConfig()
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValidationError):
         ac.inject_context = False  # type: ignore[misc]
 
 
@@ -131,3 +134,34 @@ def test_timberlineError():
     err = TimberlineError("boom")
     assert str(err) == "boom"
     assert isinstance(err, Exception)
+
+
+# ─── Pydantic validation tests ───────────────────────────────────────────────
+
+
+def test_branchTemplate_validation():
+    with pytest.raises(ValidationError, match="must contain \\{name\\}"):
+        TimberlineConfig(branch_template="no-name-placeholder")
+
+
+def test_scanDepth_validation():
+    with pytest.raises(ValidationError, match="scan_depth must be >= 1"):
+        EnvConfig(scan_depth=0)
+
+
+def test_namingScheme_coercion():
+    cfg = TimberlineConfig.model_validate({"naming_scheme": "cities"})
+    assert cfg.naming_scheme == NamingScheme.CITIES
+
+
+def test_invalidNamingScheme():
+    with pytest.raises(ValidationError):
+        TimberlineConfig.model_validate({"naming_scheme": "bogus"})
+
+
+def test_unknownKey_warns():
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        cfg = TimberlineConfig.model_validate({"unknown_field": "val", "user": "test"})
+        assert cfg.user == "test"
+        assert any("Unknown config key: 'unknown_field'" in str(warning.message) for warning in w)

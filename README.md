@@ -58,11 +58,14 @@ tl rm auth-refactor         # clean up
 
 Run `tl init` inside any git repo to create `.timberline.toml`. The wizard auto-detects:
 
+- **Project name** — defaults to the repo directory name, used for global worktree storage at `~/.timberline/projects/<name>/`
 - **Branch prefix** from your git user
 - **Base branch** (main/master/develop)
 - **Package manager** (bun, npm, pnpm, yarn, uv, pip, cargo, go, composer, bundle) for dependency install
 - **Pre-land checks** (Makefile targets, npm scripts like `lint`, `test`, `check`)
 - **Default agent** (claude, codex, opencode, aider) if installed
+
+Worktrees are stored globally at `~/.timberline/projects/<project>/worktrees/` — fully outside the repo tree. This prevents agents from accidentally writing files into the parent repo.
 
 Use `--defaults` to skip prompts and accept detected values.
 
@@ -146,7 +149,7 @@ pre_land = "make check"  # or "bun run lint && bun run test", etc.
 
 ```toml
 [timberline]
-worktree_dir = ".tl"
+project_name = "my-project"  # global storage name (~/.timberline/projects/<name>/)
 branch_template = "{user}/{type}/{name}"
 user = "nc9"
 default_type = "feature"

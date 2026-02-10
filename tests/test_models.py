@@ -1,4 +1,5 @@
 import warnings
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -15,6 +16,11 @@ from timberline.models import (
     TimberlineConfig,
     TimberlineError,
     WorktreeInfo,
+    getProjectDir,
+    getTimberlineHome,
+    getWorktreeBasePath,
+    resolveProjectName,
+    writeRepoRootMarker,
 )
 
 
@@ -40,6 +46,7 @@ def test_branchType_values():
 def test_timberlineConfig_defaults():
     cfg = TimberlineConfig()
     assert cfg.worktree_dir == ".tl"
+    assert cfg.project_name == ""
     assert cfg.branch_template == "{user}/{type}/{name}"
     assert cfg.user == ""
     assert cfg.default_type == "feature"
@@ -165,3 +172,49 @@ def test_unknownKey_warns():
         cfg = TimberlineConfig.model_validate({"unknown_field": "val", "user": "test"})
         assert cfg.user == "test"
         assert any("Unknown config key: 'unknown_field'" in str(warning.message) for warning in w)
+
+
+# ─── Path helper tests ────────────────────────────────────────────────────────
+
+
+def test_getTimberlineHome(tl_home: Path):
+    assert getTimberlineHome() == tl_home
+
+
+def test_getProjectDir(tl_home: Path):
+    assert getProjectDir("myproj") == tl_home / "projects" / "myproj"
+
+
+def test_getWorktreeBasePath(tl_home: Path):
+    assert getWorktreeBasePath("myproj") == tl_home / "projects" / "myproj" / "worktrees"
+
+
+def test_resolveProjectName_configured():
+    assert resolveProjectName(Path("/any/path"), "explicit") == "explicit"
+
+
+def test_resolveProjectName_derived(tl_home: Path):
+    assert resolveProjectName(Path("/home/user/myrepo"), "") == "myrepo"
+
+
+def test_resolveProjectName_conflict(tl_home: Path):
+    """Different repo_root with same name → prefixes with parent dir."""
+    # first project claims the name
+    writeRepoRootMarker("myrepo", Path("/other/path/myrepo"))
+    # second project with same basename but different root
+    result = resolveProjectName(Path("/home/user/myrepo"), "")
+    assert result == "user-myrepo"
+
+
+def test_resolveProjectName_no_conflict(tl_home: Path):
+    """Same repo_root → no prefix needed."""
+    writeRepoRootMarker("myrepo", Path("/home/user/myrepo"))
+    result = resolveProjectName(Path("/home/user/myrepo"), "")
+    assert result == "myrepo"
+
+
+def test_writeRepoRootMarker(tl_home: Path):
+    writeRepoRootMarker("testproj", Path("/repo/root"))
+    marker = tl_home / "projects" / "testproj" / "repo_root"
+    assert marker.exists()
+    assert marker.read_text().strip() == "/repo/root"

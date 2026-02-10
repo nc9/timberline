@@ -55,7 +55,7 @@ def buildEnvVars(info: WorktreeInfo, repo_root: Path) -> dict[str, str]:
 
 
 def buildContextBlock(
-    info: WorktreeInfo, all_worktrees: list[WorktreeInfo], repo_root: Path
+    info: WorktreeInfo, all_worktrees: list[WorktreeInfo], project_name: str
 ) -> str:
     others = [wt.name for wt in all_worktrees if wt.name != info.name]
     others_str = ", ".join(others) if others else "none"
@@ -68,16 +68,16 @@ You are working in a **Timberline-managed git worktree**.
 
 | Key         | Value                            |
 |-------------|----------------------------------|
+| Project     | {project_name} |
 | Worktree    | {info.name} |
 | Branch      | {info.branch} |
 | Base branch | {info.base_branch} |
-| Main repo   | {repo_root} |
 
 ## Guidelines
 
-- This is an isolated worktree. Changes here do not affect other worktrees or the main checkout.
+- Your working directory is this worktree. All file operations MUST stay within this directory.
+- Do NOT write files outside this worktree.
 - Commit to this branch (`{info.branch}`). It can be merged via PR.
-- The main repo is at `{repo_root}` — reference it read-only if needed.
 - Other active worktrees: {others_str}. Do not modify those.
 
 ## Useful Commands
@@ -95,10 +95,10 @@ def injectAgentContext(
     worktree_path: Path,
     info: WorktreeInfo,
     all_worktrees: list[WorktreeInfo],
-    repo_root: Path,
+    project_name: str,
 ) -> None:
     context_file = worktree_path / agent.context_file
-    block = buildContextBlock(info, all_worktrees, repo_root)
+    block = buildContextBlock(info, all_worktrees, project_name)
 
     if context_file.exists():
         content = context_file.read_text()

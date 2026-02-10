@@ -3,30 +3,30 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from timberline.models import StateFile, WorktreeInfo
+from timberline.models import StateFile, WorktreeInfo, getProjectDir, getWorktreeBasePath
 
-STATE_FILENAME = ".tl-state.json"
-
-
-def _stateFilePath(repo_root: Path, worktree_dir: str) -> Path:
-    return repo_root / worktree_dir / STATE_FILENAME
+STATE_FILENAME = "state.json"
 
 
-def loadState(repo_root: Path, worktree_dir: str) -> StateFile:
-    path = _stateFilePath(repo_root, worktree_dir)
+def _stateFilePath(project_name: str) -> Path:
+    return getProjectDir(project_name) / STATE_FILENAME
+
+
+def loadState(project_name: str, repo_root: Path | None = None) -> StateFile:
+    path = _stateFilePath(project_name)
     if not path.exists():
-        return StateFile(repo_root=str(repo_root))
+        return StateFile(repo_root=str(repo_root) if repo_root else "")
 
     data = json.loads(path.read_text())
     return StateFile(
         version=data.get("version", 1),
-        repo_root=data.get("repo_root", str(repo_root)),
+        repo_root=data.get("repo_root", str(repo_root) if repo_root else ""),
         worktrees=data.get("worktrees", {}),
     )
 
 
-def saveState(repo_root: Path, worktree_dir: str, state: StateFile) -> None:
-    path = _stateFilePath(repo_root, worktree_dir)
+def saveState(project_name: str, state: StateFile) -> None:
+    path = _stateFilePath(project_name)
     path.parent.mkdir(parents=True, exist_ok=True)
     data = {
         "version": state.version,
@@ -74,7 +74,7 @@ def removeWorktreeFromState(state: StateFile, name: str) -> StateFile:
 
 
 def reconcileState(
-    state: StateFile, git_worktrees: list[dict[str, str]], worktree_dir: str
+    state: StateFile, git_worktrees: list[dict[str, str]], project_name: str
 ) -> StateFile:
     """Remove orphaned entries, add untracked worktrees."""
     git_paths = {wt["worktree"] for wt in git_worktrees}
@@ -85,15 +85,27 @@ def reconcileState(
         if info.get("path") in git_paths:
             new_worktrees[name] = info
 
-    # add untracked (worktrees in tl dir not in state)
+    # add untracked (worktrees in global dir not in state)
     known_paths = {info.get("path") for info in new_worktrees.values()}
+    tl_prefix = str(getWorktreeBasePath(project_name)) + "/"
+
+    # also check legacy .tl/ prefix for backward compat
     repo_root = state.repo_root
-    tl_prefix = f"{repo_root}/{worktree_dir}/"
+    legacy_prefix = f"{repo_root}/.tl/" if repo_root else ""
 
     for wt in git_worktrees:
         wt_path = wt["worktree"]
-        if wt_path.startswith(tl_prefix) and wt_path not in known_paths:
-            name = wt_path.removeprefix(tl_prefix).split("/")[0]
+        if wt_path in known_paths:
+            continue
+
+        prefix = ""
+        if wt_path.startswith(tl_prefix):
+            prefix = tl_prefix
+        elif legacy_prefix and wt_path.startswith(legacy_prefix):
+            prefix = legacy_prefix
+
+        if prefix:
+            name = wt_path.removeprefix(prefix).split("/")[0]
             if name and name not in new_worktrees:
                 new_worktrees[name] = {
                     "branch": wt.get("branch", ""),

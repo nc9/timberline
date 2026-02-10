@@ -6,6 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from timberline.cli import app
+from timberline.models import getProjectDir
 
 runner = CliRunner()
 
@@ -28,11 +29,12 @@ def test_init_defaults(repo_dir: Path):
     assert (repo_dir / ".timberline.toml").exists()
 
 
-def test_init_creates_gitignore_entry(repo_dir: Path):
+def test_init_creates_project_dir(repo_dir: Path):
     result = runner.invoke(app, ["init", "--defaults"])
     assert result.exit_code == 0
-    content = (repo_dir / ".gitignore").read_text()
-    assert ".tl/" in content
+    project_dir = getProjectDir(repo_dir.name)
+    assert project_dir.exists()
+    assert (project_dir / "repo_root").exists()
 
 
 def test_new_and_ls(repo_dir: Path):
@@ -196,9 +198,9 @@ def test_new_outputs_path_to_stdout(repo_dir: Path):
     runner.invoke(app, ["init", "--defaults", "--user", "test"])
     result = runner.invoke(app, ["new", "obsidian", "--no-init"])
     assert result.exit_code == 0
-    # stdout path is last line (bare print)
+    # stdout path is last line (bare print) — now under .timberline
     lines = result.output.strip().splitlines()
-    assert any("obsidian" in line and str(repo_dir) in line for line in lines)
+    assert any("obsidian" in line and ".timberline" in line for line in lines)
 
 
 def test_rename(repo_dir: Path):
@@ -269,3 +271,14 @@ def test_init_writes_commented_config(repo_dir: Path):
     content = (repo_dir / ".timberline.toml").read_text()
     # should have comments for default values
     assert "# worktree_dir" in content or "# default_type" in content
+
+
+def test_worktree_not_in_repo(repo_dir: Path):
+    """Worktrees created via CLI should not be under repo dir."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    result = runner.invoke(app, ["new", "isolated", "--no-init"])
+    assert result.exit_code == 0
+    # the path in output should NOT be under repo_dir
+    lines = result.output.strip().splitlines()
+    path_line = [ln for ln in lines if ".timberline" in ln]
+    assert path_line  # should have a line with global path

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from timberline.config import writeConfig
-from timberline.models import TimberlineConfig, TimberlineError
+from timberline.models import TimberlineConfig, TimberlineError, getWorktreeBasePath
 from timberline.worktree import (
     createWorktree,
     getWorktree,
@@ -18,14 +18,15 @@ from timberline.worktree import (
 
 @pytest.fixture
 def repo_with_config(tmp_git_repo: Path) -> tuple[Path, TimberlineConfig]:
-    cfg = TimberlineConfig(user="test", base_branch="main")
+    cfg = TimberlineConfig(user="test", base_branch="main", project_name="testrepo")
     writeConfig(tmp_git_repo, cfg)
     return tmp_git_repo, cfg
 
 
 def test_getWorktreePath(tmp_path: Path):
-    cfg = TimberlineConfig()
-    assert getWorktreePath(tmp_path, cfg, "obsidian") == tmp_path / ".tl" / "obsidian"
+    cfg = TimberlineConfig(project_name="myproj")
+    path = getWorktreePath(cfg, "obsidian", tmp_path)
+    assert path == getWorktreeBasePath("myproj") / "obsidian"
 
 
 def test_resolveBranchName():
@@ -106,3 +107,14 @@ def test_getWorktree(repo_with_config: tuple[Path, TimberlineConfig]):
 def test_getWorktree_missing(repo_with_config: tuple[Path, TimberlineConfig]):
     repo, cfg = repo_with_config
     assert getWorktree(repo, cfg, "nonexistent") is None
+
+
+def test_worktree_path_outside_repo(repo_with_config: tuple[Path, TimberlineConfig]):
+    """Worktrees should be created outside the repo directory."""
+    repo, cfg = repo_with_config
+    info = createWorktree(repo, cfg, name="external")
+    wt_path = Path(info.path)
+    # worktree should NOT be under repo_root
+    assert not str(wt_path).startswith(str(repo))
+    # should be under TIMBERLINE_HOME
+    assert ".timberline" in str(wt_path)

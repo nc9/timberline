@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 import warnings
 from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -80,7 +82,12 @@ class AgentConfig(_StrictConfig):
 
 
 class TimberlineConfig(_StrictConfig):
-    worktree_dir: str = Field(".tl", description="Directory for worktrees (relative to repo root)")
+    worktree_dir: str = Field(
+        ".tl", description="Directory for worktrees (legacy, relative to repo root)"
+    )
+    project_name: str = Field(
+        "", description="Project name for global worktree storage (default: repo dir name)"
+    )
     branch_template: str = Field(
         "{user}/{type}/{name}",
         description="Branch name template. Must contain {name}. Vars: {user}, {type}, {name}",
@@ -148,3 +155,43 @@ class StateFile:
 
 class TimberlineError(Exception):
     pass
+
+
+# ─── Global path helpers ──────────────────────────────────────────────────────
+
+
+def getTimberlineHome() -> Path:
+    return Path(os.environ.get("TIMBERLINE_HOME", str(Path.home() / ".timberline")))
+
+
+def getProjectDir(project_name: str) -> Path:
+    return getTimberlineHome() / "projects" / project_name
+
+
+def getWorktreeBasePath(project_name: str) -> Path:
+    return getProjectDir(project_name) / "worktrees"
+
+
+def resolveProjectName(repo_root: Path, configured_name: str) -> str:
+    """Return project name: use configured_name or derive from repo_root."""
+    if configured_name:
+        return configured_name
+
+    candidate = repo_root.name
+    project_dir = getProjectDir(candidate)
+    marker = project_dir / "repo_root"
+
+    if marker.exists():
+        existing_root = marker.read_text().strip()
+        if existing_root != str(repo_root):
+            # conflict — prefix with parent dir
+            parent = repo_root.parent.name
+            candidate = f"{parent}-{candidate}"
+
+    return candidate
+
+
+def writeRepoRootMarker(project_name: str, repo_root: Path) -> None:
+    project_dir = getProjectDir(project_name)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    (project_dir / "repo_root").write_text(str(repo_root) + "\n")

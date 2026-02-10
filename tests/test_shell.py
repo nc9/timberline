@@ -26,6 +26,7 @@ def test_generateShellInit_zsh():
     assert "tlcd()" in out
     assert "tln()" in out
     assert "[[ -n" in out
+    assert ".timberline/projects/" in out
 
 
 def test_generateShellInit_fish():

@@ -22,3 +22,11 @@ def tmp_git_repo(tmp_path: Path) -> Path:
     subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
     subprocess.run(["git", "commit", "-m", "init"], cwd=repo, capture_output=True, check=True)
     return repo
+
+
+@pytest.fixture(autouse=True)
+def tl_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Redirect TIMBERLINE_HOME to temp dir for all tests."""
+    home = tmp_path / ".timberline"
+    monkeypatch.setenv("TIMBERLINE_HOME", str(home))
+    return home

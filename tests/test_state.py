@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from timberline.models import StateFile, WorktreeInfo
+from timberline.models import StateFile, WorktreeInfo, getWorktreeBasePath
 from timberline.state import (
     addWorktreeToState,
     loadState,
@@ -13,27 +13,29 @@ from timberline.state import (
 )
 
 
-def test_loadState_missing(tmp_path: Path):
-    state = loadState(tmp_path, ".tl")
+def test_loadState_missing():
+    state = loadState("testproj", Path("/repo"))
     assert state.version == 1
     assert state.worktrees == {}
 
 
-def test_saveState_and_load_roundTrip(tmp_path: Path):
+def test_saveState_and_load_roundTrip(tl_home: Path):
+    project = "roundtrip"
+    wt_base = str(getWorktreeBasePath(project))
     state = StateFile(
-        repo_root=str(tmp_path),
+        repo_root="/repo",
         worktrees={
             "obsidian": {
                 "branch": "nik/feature/obsidian",
                 "base_branch": "main",
                 "type": "feature",
                 "created_at": "2026-01-01T00:00:00+00:00",
-                "path": str(tmp_path / ".tl" / "obsidian"),
+                "path": f"{wt_base}/obsidian",
             }
         },
     )
-    saveState(tmp_path, ".tl", state)
-    loaded = loadState(tmp_path, ".tl")
+    saveState(project, state)
+    loaded = loadState(project)
     assert loaded.worktrees["obsidian"]["branch"] == "nik/feature/obsidian"
 
 
@@ -44,7 +46,7 @@ def test_addWorktreeToState():
         branch="nik/feature/test",
         base_branch="main",
         type="feature",
-        path="/repo/.tl/test",
+        path="/global/.timberline/projects/repo/worktrees/test",
         created_at="2026-01-01T00:00:00+00:00",
     )
     new_state = addWorktreeToState(state, info)
@@ -56,7 +58,7 @@ def test_addWorktreeToState():
 def test_removeWorktreeFromState():
     state = StateFile(
         repo_root="/repo",
-        worktrees={"a": {"branch": "b", "path": "/repo/.tl/a"}},
+        worktrees={"a": {"branch": "b", "path": "/global/worktrees/a"}},
     )
     new_state = removeWorktreeFromState(state, "a")
     assert "a" not in new_state.worktrees
@@ -64,38 +66,51 @@ def test_removeWorktreeFromState():
     assert "a" in state.worktrees
 
 
-def test_reconcileState_removes_orphans():
+def test_reconcileState_removes_orphans(tl_home: Path):
+    wt_base = str(getWorktreeBasePath("myproj"))
     state = StateFile(
         repo_root="/repo",
         worktrees={
-            "exists": {"branch": "b", "path": "/repo/.tl/exists"},
-            "gone": {"branch": "c", "path": "/repo/.tl/gone"},
+            "exists": {"branch": "b", "path": f"{wt_base}/exists"},
+            "gone": {"branch": "c", "path": f"{wt_base}/gone"},
         },
     )
     git_wts = [
         {"worktree": "/repo", "branch": "main"},
-        {"worktree": "/repo/.tl/exists", "branch": "b"},
+        {"worktree": f"{wt_base}/exists", "branch": "b"},
     ]
-    result = reconcileState(state, git_wts, ".tl")
+    result = reconcileState(state, git_wts, "myproj")
     assert "exists" in result.worktrees
     assert "gone" not in result.worktrees
 
 
-def test_reconcileState_adds_untracked():
+def test_reconcileState_adds_untracked(tl_home: Path):
+    wt_base = str(getWorktreeBasePath("myproj"))
     state = StateFile(repo_root="/repo", worktrees={})
     git_wts = [
         {"worktree": "/repo", "branch": "main"},
-        {"worktree": "/repo/.tl/unknown", "branch": "feat/unknown"},
+        {"worktree": f"{wt_base}/unknown", "branch": "feat/unknown"},
     ]
-    result = reconcileState(state, git_wts, ".tl")
+    result = reconcileState(state, git_wts, "myproj")
     assert "unknown" in result.worktrees
     assert result.worktrees["unknown"]["branch"] == "feat/unknown"
+
+
+def test_reconcileState_legacy_prefix(tl_home: Path):
+    """Backward compat: recognizes worktrees in old .tl/ dir."""
+    state = StateFile(repo_root="/repo", worktrees={})
+    git_wts = [
+        {"worktree": "/repo", "branch": "main"},
+        {"worktree": "/repo/.tl/legacy", "branch": "feat/legacy"},
+    ]
+    result = reconcileState(state, git_wts, "myproj")
+    assert "legacy" in result.worktrees
 
 
 def test_updateWorktreeBranch():
     state = StateFile(
         repo_root="/repo",
-        worktrees={"a": {"branch": "old/branch", "path": "/repo/.tl/a"}},
+        worktrees={"a": {"branch": "old/branch", "path": "/global/worktrees/a"}},
     )
     new_state = updateWorktreeBranch(state, "a", "new/branch")
     assert new_state.worktrees["a"]["branch"] == "new/branch"

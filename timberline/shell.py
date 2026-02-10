@@ -11,7 +11,7 @@ tln() { local d; d="$(tl new "$@")" && cd "$d" || return 1; }
 tl-prompt() {
     if [ -n "$TL_WORKTREE" ]; then
         echo "🪓 $TL_WORKTREE"
-    elif [ -f .git ] && grep -q ".tl" .git 2>/dev/null; then
+    elif [ -f .git ] && grep -q ".timberline/projects/" .git 2>/dev/null; then
         echo "🪓 $(basename "$PWD")"
     fi
 }
@@ -25,7 +25,7 @@ tln() { local d; d="$(tl new "$@")" && cd "$d" || return 1; }
 tl-prompt() {
     if [[ -n "$TL_WORKTREE" ]]; then
         echo "🪓 $TL_WORKTREE"
-    elif [[ -f .git ]] && grep -q ".tl" .git 2>/dev/null; then
+    elif [[ -f .git ]] && grep -q ".timberline/projects/" .git 2>/dev/null; then
         echo "🪓 $(basename "$PWD")"
     fi
 }
@@ -44,7 +44,7 @@ end
 function tl-prompt
     if test -n "$TL_WORKTREE"
         echo "🪓 $TL_WORKTREE"
-    else if test -f .git; and grep -q ".tl" .git 2>/dev/null
+    else if test -f .git; and grep -q ".timberline/projects/" .git 2>/dev/null
         echo "🪓 "(basename $PWD)
     end
 end

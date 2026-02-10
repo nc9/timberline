@@ -51,6 +51,8 @@ from timberline.models import (
     TimberlineConfig,
     TimberlineError,
     WorktreeInfo,
+    resolveProjectName,
+    writeRepoRootMarker,
 )
 from timberline.shell import (
     detectShell,
@@ -215,6 +217,13 @@ def init(
     # detect pre-land checks
     pre_land = detectPreLand(repo_root)
 
+    # resolve project name
+    default_project = resolveProjectName(repo_root, "")
+    if defaults:
+        project_name = default_project
+    else:
+        project_name = typer.prompt("Project name", default=default_project)
+
     if not defaults:
         printSuccess(f"Git root: {repo_root}")
         if env_files:
@@ -230,24 +239,16 @@ def init(
         naming_scheme=naming,
         default_agent=default_agent,
         pre_land=pre_land,
+        project_name=project_name,
         init=InitConfig(init_command=init_command) if init_command else InitConfig(),
     )
 
     writeInitConfig(repo_root, config)
     printSuccess("Created .timberline.toml")
 
-    # update .gitignore
-    gitignore = repo_root / ".gitignore"
-    entries = [config.worktree_dir + "/", ".tl/"]
-    if gitignore.exists():
-        content = gitignore.read_text()
-        added = [e for e in entries if e not in content]
-        if added:
-            gitignore.write_text(content.rstrip() + "\n" + "\n".join(added) + "\n")
-            printSuccess("Updated .gitignore")
-    else:
-        gitignore.write_text("\n".join(entries) + "\n")
-        printSuccess("Created .gitignore")
+    # create project dir + repo_root marker
+    writeRepoRootMarker(project_name, repo_root)
+    printSuccess(f"Project: {project_name}")
 
     printSuccess("Ready — run `tl new` to create your first worktree")
 
@@ -304,7 +305,8 @@ def new_cmd(
     if config.agent.inject_context:
         agent_def = getAgentDef(config.default_agent, config.agent.context_file)
         all_wts = listWorktrees(repo_root, config)
-        injectAgentContext(agent_def, wt_path, info, all_wts, repo_root)
+        project_name = resolveProjectName(repo_root, config.project_name)
+        injectAgentContext(agent_def, wt_path, info, all_wts, project_name)
         steps.append(f"Injected {agent_def.context_file} context")
 
     printCreateSummary(info, steps)
@@ -677,9 +679,10 @@ def rename(
     renameBranch(old_branch, new_branch, cwd=wt_path)
 
     # update state
-    state = loadState(repo_root, config.worktree_dir)
+    project_name = resolveProjectName(repo_root, config.project_name)
+    state = loadState(project_name, repo_root)
     state = updateWorktreeBranch(state, wt.name, new_branch)
-    saveState(repo_root, config.worktree_dir, state)
+    saveState(project_name, state)
 
     printSuccess(f"Renamed {old_branch} → {new_branch}")
 

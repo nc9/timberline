@@ -11,7 +11,14 @@ from timberline.git import (
     listWorktreesRaw,
     runGit,
 )
-from timberline.models import TimberlineConfig, TimberlineError, WorktreeInfo
+from timberline.models import (
+    TimberlineConfig,
+    TimberlineError,
+    WorktreeInfo,
+    getWorktreeBasePath,
+    resolveProjectName,
+    writeRepoRootMarker,
+)
 from timberline.names import generateName
 from timberline.state import (
     addWorktreeToState,
@@ -22,8 +29,12 @@ from timberline.state import (
 )
 
 
-def getWorktreePath(repo_root: Path, config: TimberlineConfig, name: str) -> Path:
-    return repo_root / config.worktree_dir / name
+def _projectName(config: TimberlineConfig, repo_root: Path) -> str:
+    return resolveProjectName(repo_root, config.project_name)
+
+
+def getWorktreePath(config: TimberlineConfig, name: str, repo_root: Path) -> Path:
+    return getWorktreeBasePath(_projectName(config, repo_root)) / name
 
 
 def resolveBranchName(config: TimberlineConfig, name: str, type_: str | None = None) -> str:
@@ -40,13 +51,15 @@ def createWorktree(
     type_: str | None = None,
 ) -> WorktreeInfo:
     """Create git worktree + update state. Returns WorktreeInfo."""
+    project_name = _projectName(config, repo_root)
+
     # resolve name
     if not name:
-        state = loadState(repo_root, config.worktree_dir)
+        state = loadState(project_name, repo_root)
         existing = set(state.worktrees.keys())
         name = generateName(config.naming_scheme, existing)
 
-    wt_path = getWorktreePath(repo_root, config, name)
+    wt_path = getWorktreeBasePath(project_name) / name
     if wt_path.exists():
         raise TimberlineError(f"Worktree '{name}' already exists at {wt_path}")
 
@@ -60,6 +73,9 @@ def createWorktree(
     # check branch doesn't already exist
     if branchExists(branch, cwd=repo_root):
         raise TimberlineError(f"Branch '{branch}' already exists")
+
+    # ensure project dir + repo_root marker
+    writeRepoRootMarker(project_name, repo_root)
 
     # create worktree
     runGit("worktree", "add", "-b", branch, str(wt_path), base_branch, cwd=repo_root)
@@ -75,9 +91,9 @@ def createWorktree(
     )
 
     # update state
-    state = loadState(repo_root, config.worktree_dir)
+    state = loadState(project_name, repo_root)
     state = addWorktreeToState(state, info)
-    saveState(repo_root, config.worktree_dir, state)
+    saveState(project_name, state)
 
     return info
 
@@ -89,7 +105,8 @@ def removeWorktree(
     force: bool = False,
     keep_branch: bool = False,
 ) -> None:
-    wt_path = getWorktreePath(repo_root, config, name)
+    project_name = _projectName(config, repo_root)
+    wt_path = getWorktreeBasePath(project_name) / name
     if not wt_path.exists():
         raise TimberlineError(f"Worktree '{name}' not found at {wt_path}")
 
@@ -100,7 +117,7 @@ def removeWorktree(
         )
 
     # get branch before removing
-    state = loadState(repo_root, config.worktree_dir)
+    state = loadState(project_name, repo_root)
     branch = state.worktrees.get(name, {}).get("branch", "")
 
     # remove worktree (always --force: git rejects even untracked files without it)
@@ -116,16 +133,17 @@ def removeWorktree(
 
     # update state
     state = removeWorktreeFromState(state, name)
-    saveState(repo_root, config.worktree_dir, state)
+    saveState(project_name, state)
 
 
 def listWorktrees(repo_root: Path, config: TimberlineConfig) -> list[WorktreeInfo]:
     """List all managed worktrees, reconciling state with git."""
-    state = loadState(repo_root, config.worktree_dir)
+    project_name = _projectName(config, repo_root)
+    state = loadState(project_name, repo_root)
     git_wts = listWorktreesRaw(repo_root)
 
-    state = reconcileState(state, git_wts, config.worktree_dir)
-    saveState(repo_root, config.worktree_dir, state)
+    state = reconcileState(state, git_wts, project_name)
+    saveState(project_name, state)
 
     worktrees: list[WorktreeInfo] = []
     for name, data in state.worktrees.items():

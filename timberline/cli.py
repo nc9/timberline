@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import importlib.metadata
 import os
 import subprocess
 from pathlib import Path
@@ -69,12 +70,32 @@ from timberline.worktree import (
     removeWorktree,
 )
 
+
+def _versionCallback(value: bool) -> None:
+    if value:
+        print(f"timberline {importlib.metadata.version('timberline')}")
+        raise typer.Exit()
+
+
 app = typer.Typer(
     name="tl",
     help="Git worktree manager for parallel coding agent development",
     no_args_is_help=True,
     pretty_exceptions_enable=False,
 )
+
+
+@app.callback(invoke_without_command=True)
+def _main(
+    version: Annotated[
+        bool | None,
+        typer.Option(
+            "--version", "-V", callback=_versionCallback, is_eager=True, help="Show version"
+        ),
+    ] = None,
+) -> None:
+    """Git worktree manager for parallel coding agent development."""
+
 
 env_app = typer.Typer(help="Manage .env files across worktrees", no_args_is_help=True)
 config_app = typer.Typer(help="Manage timberline configuration", no_args_is_help=True)

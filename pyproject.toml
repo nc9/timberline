@@ -1,6 +1,6 @@
 [project]
 name = "timberline"
-version = "0.1.3"
+version = "0.1.4"
 description = "Git worktree manager for parallel coding agent development"
 readme = "README.md"
 license = "MIT"

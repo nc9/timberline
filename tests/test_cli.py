@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
@@ -282,3 +283,75 @@ def test_worktree_not_in_repo(repo_dir: Path):
     lines = result.output.strip().splitlines()
     path_line = [ln for ln in lines if ".timberline" in ln]
     assert path_line  # should have a line with global path
+
+
+# ─── Session linking CLI tests ────────────────────────────────────────────────
+
+
+def test_new_no_link_flag(repo_dir: Path):
+    """--no-link skips session linking even when config enabled."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["config", "set", "agent.link_project_session", "true"])
+
+    with patch("timberline.cli.linkProjectSession") as mock_link:
+        result = runner.invoke(app, ["new", "obsidian", "--no-init", "--no-link"])
+        assert result.exit_code == 0
+        mock_link.assert_not_called()
+
+
+def test_new_links_session_when_enabled(repo_dir: Path):
+    """tl new calls linkProjectSession when config enabled."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["config", "set", "agent.link_project_session", "true"])
+
+    with patch("timberline.cli.linkProjectSession", return_value=True) as mock_link:
+        result = runner.invoke(app, ["new", "obsidian", "--no-init"])
+        assert result.exit_code == 0
+        mock_link.assert_called_once()
+        assert "Linked agent session" in result.output
+
+
+def test_new_no_link_when_config_disabled(repo_dir: Path):
+    """tl new does not call linkProjectSession when config disabled (default)."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+
+    with patch("timberline.cli.linkProjectSession") as mock_link:
+        result = runner.invoke(app, ["new", "obsidian", "--no-init"])
+        assert result.exit_code == 0
+        mock_link.assert_not_called()
+
+
+def test_rm_unlinks_session(repo_dir: Path):
+    """tl rm calls unlinkProjectSession when config enabled."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["config", "set", "agent.link_project_session", "true"])
+    runner.invoke(app, ["new", "obsidian", "--no-init"])
+
+    with patch("timberline.cli.unlinkProjectSession") as mock_unlink:
+        result = runner.invoke(app, ["rm", "obsidian"])
+        assert result.exit_code == 0
+        mock_unlink.assert_called_once()
+
+
+def test_rm_all_unlinks_sessions(repo_dir: Path):
+    """tl rm --all calls unlinkProjectSession for each worktree."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["config", "set", "agent.link_project_session", "true"])
+    runner.invoke(app, ["new", "alpha", "--no-init"])
+    runner.invoke(app, ["new", "beta", "--no-init"])
+
+    with patch("timberline.cli.unlinkProjectSession") as mock_unlink:
+        result = runner.invoke(app, ["rm", "--all"])
+        assert result.exit_code == 0
+        assert mock_unlink.call_count == 2
+
+
+def test_rm_no_unlink_when_config_disabled(repo_dir: Path):
+    """tl rm does not call unlinkProjectSession when config disabled."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["new", "obsidian", "--no-init"])
+
+    with patch("timberline.cli.unlinkProjectSession") as mock_unlink:
+        result = runner.invoke(app, ["rm", "obsidian"])
+        assert result.exit_code == 0
+        mock_unlink.assert_not_called()

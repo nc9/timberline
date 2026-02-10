@@ -79,6 +79,9 @@ class AgentConfig(_StrictConfig):
     context_file: str | None = Field(
         None, description="Custom context file path (default: agent-specific)"
     )
+    link_project_session: bool = Field(
+        False, description="Symlink worktree agent session to main repo session"
+    )
 
 
 class TimberlineConfig(_StrictConfig):

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 
 from timberline.models import AgentDef, WorktreeInfo
@@ -117,3 +119,72 @@ def launchAgent(agent: AgentDef, worktree_path: Path, env_vars: dict[str, str]) 
     env = {**os.environ, **env_vars}
     os.chdir(worktree_path)
     os.execvpe(agent.binary, [agent.binary], env)
+
+
+# ─── Session linking ──────────────────────────────────────────────────────────
+
+
+def encodeClaudePath(path: str) -> str:
+    """Encode absolute path the way Claude Code does: replace /. and space with -."""
+    return re.sub(r"[/. ]", "-", path)
+
+
+def getClaudeProjectDir(path: str) -> Path:
+    """Return ~/.claude/projects/<encoded-path> for a given absolute path."""
+    return Path.home() / ".claude" / "projects" / encodeClaudePath(path)
+
+
+def _linkClaudeSession(worktree_path: Path, repo_root: Path) -> bool:
+    """Symlink worktree's Claude project dir → main repo's Claude project dir."""
+    target = getClaudeProjectDir(str(repo_root))
+    link = getClaudeProjectDir(str(worktree_path))
+
+    # already correct symlink
+    if link.is_symlink() and link.resolve() == target.resolve():
+        return False
+
+    # real directory exists — don't clobber
+    if link.exists() and not link.is_symlink():
+        return False
+
+    # stale symlink — replace
+    if link.is_symlink():
+        link.unlink()
+
+    # ensure target exists
+    target.mkdir(parents=True, exist_ok=True)
+
+    # ensure parent of link exists
+    link.parent.mkdir(parents=True, exist_ok=True)
+
+    link.symlink_to(target)
+    return True
+
+
+def _unlinkClaudeSession(worktree_path: Path) -> bool:
+    """Remove worktree's Claude project dir symlink."""
+    link = getClaudeProjectDir(str(worktree_path))
+    if link.is_symlink():
+        link.unlink()
+        return True
+    return False
+
+
+_SESSION_LINKERS: dict[str, Callable[[Path, Path], bool]] = {"claude": _linkClaudeSession}
+_SESSION_UNLINKERS: dict[str, Callable[[Path], bool]] = {"claude": _unlinkClaudeSession}
+
+
+def linkProjectSession(agent_name: str, worktree_path: Path, repo_root: Path) -> bool:
+    """Link worktree agent session to main repo session. Returns True if linked."""
+    linker = _SESSION_LINKERS.get(agent_name)
+    if linker:
+        return linker(worktree_path, repo_root)
+    return False
+
+
+def unlinkProjectSession(agent_name: str, worktree_path: Path) -> bool:
+    """Unlink worktree agent session. Returns True if unlinked."""
+    unlinker = _SESSION_UNLINKERS.get(agent_name)
+    if unlinker:
+        return unlinker(worktree_path)
+    return False

@@ -15,6 +15,8 @@ from timberline.agent import (
     getAgentDef,
     injectAgentContext,
     launchAgent,
+    linkProjectSession,
+    unlinkProjectSession,
     validateAgentBinary,
 )
 from timberline.config import (
@@ -289,6 +291,7 @@ def new_cmd(
         bool, typer.Option("--no-submodules", help="Skip submodule init")
     ] = False,
     agent: Annotated[bool, typer.Option("--agent", help="Launch coding agent after")] = False,
+    no_link: Annotated[bool, typer.Option("--no-link", help="Skip agent session linking")] = False,
 ) -> None:
     """Create a new worktree."""
     repo_root = _resolveRoot()
@@ -330,6 +333,12 @@ def new_cmd(
         injectAgentContext(agent_def, wt_path, info, all_wts, project_name)
         steps.append(f"Injected {agent_def.context_file} context")
 
+    # link agent session
+    if not no_link and config.agent.link_project_session:
+        linked = linkProjectSession(config.default_agent, wt_path, repo_root)
+        if linked:
+            steps.append("Linked agent session")
+
     printCreateSummary(info, steps)
 
     # stdout path for shell function `tln` to capture
@@ -352,9 +361,10 @@ def create_cmd(
     no_env: Annotated[bool, typer.Option("--no-env")] = False,
     no_submodules: Annotated[bool, typer.Option("--no-submodules")] = False,
     agent: Annotated[bool, typer.Option("--agent")] = False,
+    no_link: Annotated[bool, typer.Option("--no-link")] = False,
 ) -> None:
     """Alias for `tl new`."""
-    new_cmd(name, type_, branch, base, no_init, no_env, no_submodules, agent)
+    new_cmd(name, type_, branch, base, no_init, no_env, no_submodules, agent, no_link)
 
 
 # ─── list / ls ─────────────────────────────────────────────────────────────────
@@ -405,6 +415,8 @@ def rm_cmd(
         worktrees = listWorktrees(repo_root, config)
         for wt in worktrees:
             try:
+                if config.agent.link_project_session:
+                    unlinkProjectSession(config.default_agent, Path(wt.path))
                 removeWorktree(repo_root, config, wt.name, force=force, keep_branch=keep_branch)
                 printSuccess(f"Removed {wt.name}")
             except TimberlineError as e:
@@ -414,6 +426,11 @@ def rm_cmd(
     if not name:
         printError("Specify worktree name or use --all")
         raise typer.Exit(1)
+
+    # resolve path before removal for unlinking
+    wt = getWorktree(repo_root, config, name)
+    if wt and config.agent.link_project_session:
+        unlinkProjectSession(config.default_agent, Path(wt.path))
 
     try:
         removeWorktree(repo_root, config, name, force=force, keep_branch=keep_branch)

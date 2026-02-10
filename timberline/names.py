@@ -55,6 +55,63 @@ MINERALS = [
     "kyanite",
     "bismuth",
     "tungsten",
+    # elements
+    "lithium",
+    "radium",
+    "osmium",
+    "iridium",
+    "cesium",
+    "barium",
+    "helium",
+    "argon",
+    "neon",
+    "xenon",
+    "boron",
+    "silicon",
+    "sodium",
+    "sulfur",
+    "thorium",
+    "vanadium",
+    "indium",
+    "thallium",
+    "antimony",
+    "cadmium",
+    "selenium",
+    "hafnium",
+    "niobium",
+    "tantalum",
+    "palladium",
+    "rhodium",
+    "platinum",
+    "rhenium",
+    # minerals & rocks
+    "cinnabar",
+    "azurite",
+    "bauxite",
+    "gypsum",
+    "talc",
+    "olivine",
+    "augite",
+    "biotite",
+    "andesite",
+    "rhyolite",
+    "quartzite",
+    "sandstone",
+    "limestone",
+    "tuff",
+    "chert",
+    "siltstone",
+    "mudstone",
+    "breccia",
+    "dacite",
+    "dunite",
+    "norite",
+    "syenite",
+    "diorite",
+    "gabbro",
+    "aplite",
+    "eclogite",
+    "granulite",
 ]
 
 CITIES = [
@@ -105,6 +162,63 @@ CITIES = [
     "malmo",
     "turku",
     "bath",
+    # europe
+    "lyon",
+    "cork",
+    "graz",
+    "bern",
+    "nice",
+    "brno",
+    "tartu",
+    "delft",
+    "parma",
+    "siena",
+    "lucca",
+    "pisa",
+    "trier",
+    "sopot",
+    "mostar",
+    "ohrid",
+    "varna",
+    # asia
+    "pune",
+    "surat",
+    "kochi",
+    "jaipur",
+    "baku",
+    "amman",
+    "hue",
+    "lhasa",
+    "macau",
+    "davao",
+    "cebu",
+    "malang",
+    # africa
+    "accra",
+    "tunis",
+    "rabat",
+    "dakar",
+    "nairobi",
+    "mombasa",
+    "harare",
+    "lusaka",
+    "maputo",
+    "asmara",
+    "kampala",
+    # americas
+    "oaxaca",
+    "puebla",
+    "tucson",
+    "cuenca",
+    "sucre",
+    "recife",
+    "natal",
+    "belem",
+    # oceania
+    "cairns",
+    "perth",
+    "dunedin",
+    "nelson",
 ]
 
 ADJECTIVES = [
@@ -143,7 +257,12 @@ def _getPool(scheme: NamingScheme) -> list[str]:
         case NamingScheme.CITIES:
             return list(CITIES)
         case NamingScheme.COMPOUND:
-            return [f"{adj}-{noun}" for adj in ADJECTIVES for noun in MINERALS]
+            return [
+                f"{adj}-{city}-{mineral}"
+                for adj in ADJECTIVES
+                for city in CITIES
+                for mineral in MINERALS
+            ]
 
 
 def generateName(scheme: NamingScheme, existing: set[str]) -> str:

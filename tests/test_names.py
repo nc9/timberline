@@ -17,9 +17,10 @@ def test_generateName_cities():
 def test_generateName_compound():
     name = generateName(NamingScheme.COMPOUND, set())
     parts = name.split("-")
-    assert len(parts) == 2
+    assert len(parts) == 3
     assert parts[0] in ADJECTIVES
-    assert parts[1] in MINERALS
+    assert parts[1] in CITIES
+    assert parts[2] in MINERALS
 
 
 def test_generateName_avoids_existing():

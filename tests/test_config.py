@@ -25,7 +25,7 @@ def test_configExists_true(tmp_path: Path):
 def test_loadConfig_defaults(tmp_path: Path):
     cfg = loadConfig(tmp_path)
     assert cfg.worktree_dir == ".tl"
-    assert cfg.naming_scheme == NamingScheme.MINERALS
+    assert cfg.naming_scheme == NamingScheme.COMPOUND
     assert cfg.init.auto_init is True
 
 

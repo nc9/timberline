@@ -51,7 +51,7 @@ def test_timberlineConfig_defaults():
     assert cfg.user == ""
     assert cfg.default_type == "feature"
     assert cfg.base_branch == "main"
-    assert cfg.naming_scheme == NamingScheme.MINERALS
+    assert cfg.naming_scheme == NamingScheme.COMPOUND
     assert cfg.init.auto_init is True
     assert cfg.env.auto_copy is True
     assert cfg.submodules.recursive is True

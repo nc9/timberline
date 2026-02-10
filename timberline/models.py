@@ -101,7 +101,7 @@ class TimberlineConfig(_StrictConfig):
     )
     base_branch: str = Field("main", description="Base branch to create worktrees from")
     naming_scheme: NamingScheme = Field(
-        NamingScheme.MINERALS, description="Auto-name scheme: minerals, cities, or compound"
+        NamingScheme.COMPOUND, description="Auto-name scheme: minerals, cities, or compound"
     )
     default_agent: str = Field(
         "claude", description="Coding agent to launch (claude, codex, aider, opencode)"

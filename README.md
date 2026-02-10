@@ -4,6 +4,7 @@ Git worktree manager for parallel coding agent development.
 
 ## Features
 
+- **Agent session linking** — symlinks worktree's agent session data to the main repo, so coding agents inherit full conversation history and memory across worktrees
 - **Auto-launch coding agents** — spawn Claude, Codex, OpenCode, or Aider directly into a worktree (`tl new --agent`)
 - **Agent context injection** — auto-injects worktree metadata (branch, base, sibling worktrees) into agent config files (CLAUDE.md, AGENTS.md)
 - **Auto-init dependencies** — detects & installs via bun/npm/pnpm/yarn/uv/pip/cargo/go/composer/bundle on worktree creation
@@ -91,6 +92,20 @@ tlcd auth-refactor              # cd directly
 
 Each worktree gets its own branch (from `branch_template`), dependencies installed via `auto_init`, and `.env` files copied from the main repo.
 
+## Agent Session Linking
+
+When using Claude Code, each worktree normally gets a fresh session with no history. Enable session linking to share conversation history, memory, and project context across all worktrees:
+
+```bash
+tl config set agent.link_project_session true
+```
+
+This symlinks each worktree's Claude project data directory (`~/.claude/projects/<encoded-worktree-path>`) to the main repo's project directory. Your agent sees the same session history, CLAUDE.md memory, and project context regardless of which worktree you're in.
+
+- Created automatically on `tl new`
+- Cleaned up on `tl rm`
+- Skip for a single worktree with `tl new --no-link`
+
 ## Sync with Base Branch
 
 ```bash
@@ -175,6 +190,7 @@ recursive = true
 [timberline.agent]
 auto_launch = false
 inject_context = true
+link_project_session = false  # symlink worktree agent session to main repo
 ```
 
 ## Shell Integration

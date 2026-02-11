@@ -10,7 +10,8 @@ Git worktree manager for parallel coding agent development.
 - **Auto-init dependencies** — detects & installs via bun/npm/pnpm/yarn/uv/pip/cargo/go/composer/bundle on worktree creation
 - **Auto-copy .env files** — glob-based discovery with include/exclude patterns, sync & diff commands
 - **Auto-init submodules** — recursive submodule setup on worktree creation
-- **Shell integration** — `tlcd` to cd into worktrees, `tl-prompt` for PS1, auto-install for bash/zsh/fish
+- **Archive & restore** — `tl done` soft-removes a worktree (keeps directory, marks archived), warns about uncommitted/unpushed work; `tl unarchive` restores it
+- **Shell integration** — `tlcd`, `tln`, `tldone`, `tlunarchive` shell aliases, `tl-prompt` for PS1, auto-install for bash/zsh/fish
 - **Creative naming schemes** — minerals, cities, or compound names for auto-named worktrees
 - **Branch templates** — configurable `{user}/{type}/{name}` patterns for consistent naming
 - **Land workflow** — pre-land checks → push → PR creation in one command
@@ -49,10 +50,10 @@ tl init                     # create .timberline.toml
 tl new auth-refactor        # create worktree + branch
 tl new --type fix           # auto-named fix worktree
 tl ls                       # list all worktrees
-cd $(tl cd auth-refactor)   # jump into worktree
-tlcd auth-refactor          # jump into worktree (shell aliases installed)
-tl land                     # commit, run checks and push pr
-tl rm auth-refactor         # clean up
+tlcd auth-refactor          # jump into worktree
+tl land                     # run checks, push, and create PR
+tldone                      # archive worktree + cd back to main repo
+tl rm auth-refactor         # full removal (or skip if archived)
 ```
 
 ## Getting Started
@@ -132,13 +133,40 @@ tl land --skip-checks           # bypass pre-land checks
 pre_land = "make check"  # or "bun run lint && bun run test", etc.
 ```
 
+## Archive a Worktree
+
+When you're done with a worktree but want to keep it around (e.g. waiting for PR review), use `tl done` to archive it:
+
+```bash
+tldone                          # archive current worktree + cd back to repo root
+tl done --name auth-refactor    # archive by name
+tl done --force                 # skip uncommitted/unpushed warnings
+```
+
+`tl done` warns if you have uncommitted changes or unpushed commits before archiving. Archived worktrees are hidden from `tl ls` but the directory stays on disk. To see them:
+
+```bash
+tl ls --archived                # list only archived worktrees
+```
+
+Restore an archived worktree:
+
+```bash
+tl unarchive auth-refactor      # restore to active
+tlunarchive auth-refactor       # restore + cd into it
+```
+
+`tl rm` still works on archived worktrees for full removal.
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
 | `tl init` | Interactive setup, write `.timberline.toml` |
 | `tl new [name]` | Create worktree (aliases: `create`) |
-| `tl ls` | List worktrees (aliases: `list`). `--json`, `--paths` |
+| `tl ls` | List worktrees (aliases: `list`). `--json`, `--paths`, `--archived` |
+| `tl done [--name]` | Archive worktree, print repo root. `--force` |
+| `tl unarchive <name>` | Restore archived worktree |
 | `tl rm <name>` | Remove worktree (aliases: `remove`). `--force`, `--keep-branch`, `--all` |
 | `tl cd <name>` | Print worktree path. `--shell` for subshell |
 | `tl status` | Git status across all worktrees |
@@ -201,11 +229,19 @@ tl setup
 
 # Or manually add to .zshrc / .bashrc:
 eval "$(tl shell-init)"
-
-# Then use:
-tlcd obsidian       # cd into worktree
-tl-prompt           # worktree name for PS1
 ```
+
+### Shell Aliases
+
+Installed by `tl setup` (bash/zsh/fish):
+
+| Alias | Description |
+|-------|-------------|
+| `tln [args]` | Create worktree + cd into it (`tl new` wrapper) |
+| `tlcd <name>` | cd into a worktree |
+| `tldone [args]` | Archive current worktree + cd back to repo root |
+| `tlunarchive <name>` | Restore archived worktree + cd into it |
+| `tl-prompt` | Print worktree name for PS1 prompt integration |
 
 ## Development
 

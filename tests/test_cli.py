@@ -218,16 +218,16 @@ def test_rename(repo_dir: Path):
     assert "test/fix/new-name" in result.output
 
 
-def test_install_and_uninstall(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_setup_and_uninstall(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("timberline.shell.rcFilePath", lambda s: tmp_path / ".zshrc")
     monkeypatch.setattr("timberline.cli.detectShell", lambda: "zsh")
 
-    result = runner.invoke(app, ["install"])
+    result = runner.invoke(app, ["setup"])
     assert result.exit_code == 0
     assert "Added" in result.output
     assert (tmp_path / ".zshrc").exists()
 
-    result = runner.invoke(app, ["install", "--uninstall"])
+    result = runner.invoke(app, ["setup", "--uninstall"])
     assert result.exit_code == 0
     assert "Removed" in result.output
 
@@ -235,7 +235,7 @@ def test_install_and_uninstall(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 def test_help_shows_new_commands():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "install" in result.output
+    assert "setup" in result.output
     assert "rename" in result.output
     assert "land" in result.output
 
@@ -312,8 +312,8 @@ def test_new_links_session_when_enabled(repo_dir: Path):
 
 
 def test_new_no_link_when_config_disabled(repo_dir: Path):
-    """tl new does not call linkProjectSession when config disabled (default)."""
-    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    """tl new does not call linkProjectSession when config disabled."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test", "--no-link-session"])
 
     with patch("timberline.cli.linkProjectSession") as mock_link:
         result = runner.invoke(app, ["new", "obsidian", "--no-init"])
@@ -348,10 +348,53 @@ def test_rm_all_unlinks_sessions(repo_dir: Path):
 
 def test_rm_no_unlink_when_config_disabled(repo_dir: Path):
     """tl rm does not call unlinkProjectSession when config disabled."""
-    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["init", "--defaults", "--user", "test", "--no-link-session"])
     runner.invoke(app, ["new", "obsidian", "--no-init"])
 
     with patch("timberline.cli.unlinkProjectSession") as mock_unlink:
         result = runner.invoke(app, ["rm", "obsidian"])
         assert result.exit_code == 0
         mock_unlink.assert_not_called()
+
+
+# ─── Init prompt/flag tests ──────────────────────────────────────────────────
+
+
+def test_init_defaults_sets_link_session_true(repo_dir: Path):
+    """--defaults sets link_project_session=true."""
+    from timberline.config import loadConfig
+
+    result = runner.invoke(app, ["init", "--defaults"])
+    assert result.exit_code == 0
+    cfg = loadConfig(repo_dir)
+    assert cfg.agent.link_project_session is True
+
+
+def test_init_defaults_sets_auto_launch_false(repo_dir: Path):
+    """--defaults sets auto_launch=false."""
+    from timberline.config import loadConfig
+
+    result = runner.invoke(app, ["init", "--defaults"])
+    assert result.exit_code == 0
+    cfg = loadConfig(repo_dir)
+    assert cfg.agent.auto_launch is False
+
+
+def test_init_link_session_flag(repo_dir: Path):
+    """--no-link-session overrides default."""
+    from timberline.config import loadConfig
+
+    result = runner.invoke(app, ["init", "--defaults", "--no-link-session"])
+    assert result.exit_code == 0
+    cfg = loadConfig(repo_dir)
+    assert cfg.agent.link_project_session is False
+
+
+def test_init_auto_launch_flag(repo_dir: Path):
+    """--auto-launch flag sets auto_launch=true."""
+    from timberline.config import loadConfig
+
+    result = runner.invoke(app, ["init", "--defaults", "--auto-launch"])
+    assert result.exit_code == 0
+    cfg = loadConfig(repo_dir)
+    assert cfg.agent.auto_launch is True

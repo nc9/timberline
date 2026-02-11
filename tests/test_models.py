@@ -16,6 +16,7 @@ from timberline.models import (
     TimberlineConfig,
     TimberlineError,
     WorktreeInfo,
+    _normalizeProjectName,
     getProjectDir,
     getTimberlineHome,
     getWorktreeBasePath,
@@ -197,6 +198,22 @@ def test_resolveProjectName_derived(tl_home: Path):
     assert resolveProjectName(Path("/home/user/myrepo"), "") == "myrepo"
 
 
+def test_resolveProjectName_lowercase(tl_home: Path):
+    assert resolveProjectName(Path("/home/user/MyRepo"), "") == "myrepo"
+
+
+def test_resolveProjectName_spaces(tl_home: Path):
+    assert resolveProjectName(Path("/home/user/My Project"), "") == "my-project"
+
+
+def test_resolveProjectName_special_chars(tl_home: Path):
+    assert resolveProjectName(Path("/home/user/my_repo.v2"), "") == "my-repo-v2"
+
+
+def test_resolveProjectName_multiple_special(tl_home: Path):
+    assert resolveProjectName(Path("/home/user/--My__Repo--"), "") == "my-repo"
+
+
 def test_resolveProjectName_conflict(tl_home: Path):
     """Different repo_root with same name → prefixes with parent dir."""
     # first project claims the name
@@ -206,11 +223,27 @@ def test_resolveProjectName_conflict(tl_home: Path):
     assert result == "user-myrepo"
 
 
+def test_resolveProjectName_conflict_normalized(tl_home: Path):
+    """Conflict prefix also gets normalized."""
+    writeRepoRootMarker("myrepo", Path("/other/path/MyRepo"))
+    result = resolveProjectName(Path("/home/My User/MyRepo"), "")
+    assert result == "my-user-myrepo"
+
+
 def test_resolveProjectName_no_conflict(tl_home: Path):
     """Same repo_root → no prefix needed."""
     writeRepoRootMarker("myrepo", Path("/home/user/myrepo"))
     result = resolveProjectName(Path("/home/user/myrepo"), "")
     assert result == "myrepo"
+
+
+def test_normalizeProjectName():
+    assert _normalizeProjectName("MyRepo") == "myrepo"
+    assert _normalizeProjectName("my repo") == "my-repo"
+    assert _normalizeProjectName("my_repo.v2") == "my-repo-v2"
+    assert _normalizeProjectName("--leading--trailing--") == "leading-trailing"
+    assert _normalizeProjectName("UPPER CASE") == "upper-case"
+    assert _normalizeProjectName("a--b__c") == "a-b-c"
 
 
 def test_writeRepoRootMarker(tl_home: Path):

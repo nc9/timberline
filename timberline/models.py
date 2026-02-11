@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import warnings
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -175,12 +176,20 @@ def getWorktreeBasePath(project_name: str) -> Path:
     return getProjectDir(project_name) / "worktrees"
 
 
+def _normalizeProjectName(name: str) -> str:
+    """Lowercase, replace non-alphanumeric with hyphens, collapse/strip."""
+    name = name.lower()
+    name = re.sub(r"[^a-z0-9-]", "-", name)
+    name = re.sub(r"-+", "-", name)
+    return name.strip("-")
+
+
 def resolveProjectName(repo_root: Path, configured_name: str) -> str:
     """Return project name: use configured_name or derive from repo_root."""
     if configured_name:
         return configured_name
 
-    candidate = repo_root.name
+    candidate = _normalizeProjectName(repo_root.name)
     project_dir = getProjectDir(candidate)
     marker = project_dir / "repo_root"
 
@@ -189,7 +198,7 @@ def resolveProjectName(repo_root: Path, configured_name: str) -> str:
         if existing_root != str(repo_root):
             # conflict — prefix with parent dir
             parent = repo_root.parent.name
-            candidate = f"{parent}-{candidate}"
+            candidate = _normalizeProjectName(f"{parent}-{candidate}")
 
     return candidate
 

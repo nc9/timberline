@@ -49,6 +49,7 @@ from timberline.git import (
 )
 from timberline.init_deps import detectAndInstall, detectInstaller, detectPreLand
 from timberline.models import (
+    AgentConfig,
     InitConfig,
     NamingScheme,
     TimberlineConfig,
@@ -177,6 +178,16 @@ def _pushAndCreatePr(
 def init(
     defaults: Annotated[bool, typer.Option("--defaults", help="Accept all defaults")] = False,
     user: Annotated[str | None, typer.Option(help="GitHub username")] = None,
+    link_session: Annotated[
+        bool | None,
+        typer.Option(
+            "--link-session/--no-link-session", help="Link agent sessions across worktrees"
+        ),
+    ] = None,
+    auto_launch: Annotated[
+        bool | None,
+        typer.Option("--auto-launch/--no-auto-launch", help="Auto-launch agent on worktree create"),
+    ] = None,
 ) -> None:
     """Initialize timberline in this repo."""
     repo_root = _resolveRoot()
@@ -237,6 +248,24 @@ def init(
         if not validateAgentBinary(default_agent):
             printWarning(f"'{default_agent}' not found on PATH (continuing anyway)")
 
+    # agent session linking
+    if link_session is not None:
+        resolved_link_session = link_session
+    elif defaults:
+        resolved_link_session = True
+    else:
+        resolved_link_session = typer.confirm(
+            "Link agent project sessions across worktrees?", default=True
+        )
+
+    # auto-launch agent
+    if auto_launch is not None:
+        resolved_auto_launch = auto_launch
+    elif defaults:
+        resolved_auto_launch = False
+    else:
+        resolved_auto_launch = typer.confirm("Auto-launch agent on worktree create?", default=False)
+
     # detect pre-land checks
     pre_land = detectPreLand(repo_root)
 
@@ -264,6 +293,10 @@ def init(
         pre_land=pre_land,
         project_name=project_name,
         init=InitConfig(init_command=init_command) if init_command else InitConfig(),
+        agent=AgentConfig(
+            link_project_session=resolved_link_session,
+            auto_launch=resolved_auto_launch,
+        ),
     )
 
     writeInitConfig(repo_root, config)
@@ -725,11 +758,11 @@ def rename(
     printSuccess(f"Renamed {old_branch} → {new_branch}")
 
 
-# ─── install ──────────────────────────────────────────────────────────────────
+# ─── setup ────────────────────────────────────────────────────────────────────
 
 
 @app.command()
-def install(
+def setup(
     uninstall: Annotated[
         bool, typer.Option("--uninstall", help="Remove shell integration")
     ] = False,

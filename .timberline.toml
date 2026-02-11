@@ -17,4 +17,4 @@ init_command = "uv sync"
 [timberline.agent]
 auto_launch = true
 # inject_context = true  # Inject worktree context file for the agent
-link_project_session = true
+link_project_session = false

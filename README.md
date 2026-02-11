@@ -11,7 +11,8 @@ Git worktree manager for parallel coding agent development.
 - **Auto-copy .env files** — glob-based discovery with include/exclude patterns, sync & diff commands
 - **Auto-init submodules** — recursive submodule setup on worktree creation
 - **Archive & restore** — `tl done` soft-removes a worktree (keeps directory, marks archived), warns about uncommitted/unpushed work; `tl unarchive` restores it
-- **Shell integration** — `tlcd`, `tln`, `tlh`, `tld`, `tlunarchive` shell aliases, `tl-prompt` for PS1, auto-install for bash/zsh/fish
+- **Checkout existing branches & PRs** — `tl checkout nc9/feature/auth` or `tl checkout #42` to create a worktree from an existing remote branch or PR
+- **Shell integration** — `tlcd`, `tln`, `tlc`, `tlh`, `tld`, `tlunarchive` shell aliases, `tl-prompt` for PS1, auto-install for bash/zsh/fish
 - **Creative naming schemes** — minerals, cities, or compound names for auto-named worktrees
 - **Branch templates** — configurable `{user}/{type}/{name}` patterns for consistent naming
 - **Land workflow** — pre-land checks → push → PR creation in one command
@@ -49,6 +50,8 @@ cd your-repo
 tl init                     # create .timberline.toml
 tl new auth-refactor        # create worktree + branch
 tl new --type fix           # auto-named fix worktree
+tl checkout nc9/feat/auth   # worktree from existing branch
+tl checkout #42             # worktree from PR
 tl ls                       # list all worktrees
 tlcd auth-refactor          # jump into worktree
 tl land                     # run checks, push, and create PR
@@ -92,6 +95,20 @@ tlcd auth-refactor              # cd directly
 ```
 
 Each worktree gets its own branch (from `branch_template`), dependencies installed via `auto_init`, and `.env` files copied from the main repo.
+
+## Checkout Existing Branches & PRs
+
+```bash
+tl checkout nc9/feature/auth        # from remote branch (name: "auth")
+tl checkout #42                     # from PR number
+tl checkout --pr 42                 # explicit --pr flag
+tl checkout #42 --name myname       # override derived name
+tl co #42                           # alias
+```
+
+The worktree name is derived from the last `/`-segment of the branch (e.g. `nc9/feature/auth` → `auth`). Override with `--name`.
+
+When checking out a PR, `tl pr` and `tl land` will push to the existing PR instead of creating a new one.
 
 ## Agent Session Linking
 
@@ -164,6 +181,7 @@ tlunarchive auth-refactor       # restore + cd into it
 |---------|-------------|
 | `tl init` | Interactive setup, write `.timberline.toml` |
 | `tl new [name]` | Create worktree (aliases: `create`) |
+| `tl checkout <branch\|#PR>` | Worktree from existing branch or PR (aliases: `co`). `--pr`, `--name` |
 | `tl ls` | List worktrees (aliases: `list`). `--json`, `--paths`, `--archived` |
 | `tl done [--name]` | Archive worktree, print repo root. `--force` |
 | `tl unarchive <name>` | Restore archived worktree |
@@ -239,6 +257,7 @@ Installed by `tl setup` (bash/zsh/fish):
 | Alias | Description |
 |-------|-------------|
 | `tln [args]` | Create worktree + cd into it (`tl new` wrapper) |
+| `tlc [args]` | Checkout existing branch/PR + cd into it (`tl checkout` wrapper) |
 | `tlcd <name>` | cd into a worktree |
 | `tlh` | cd to repo root |
 | `tld [args]` | Archive current worktree + cd back to repo root |

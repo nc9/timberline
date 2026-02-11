@@ -73,16 +73,43 @@ def removeWorktreeFromState(state: StateFile, name: str) -> StateFile:
     )
 
 
+def archiveWorktree(state: StateFile, name: str, timestamp: str) -> StateFile:
+    if name not in state.worktrees:
+        return state
+    new_worktrees = dict(state.worktrees)
+    new_worktrees[name] = {**new_worktrees[name], "archived": timestamp}
+    return StateFile(
+        version=state.version,
+        repo_root=state.repo_root,
+        worktrees=new_worktrees,
+    )
+
+
+def unarchiveWorktree(state: StateFile, name: str) -> StateFile:
+    if name not in state.worktrees:
+        return state
+    new_worktrees = dict(state.worktrees)
+    entry = {k: v for k, v in new_worktrees[name].items() if k != "archived"}
+    new_worktrees[name] = entry
+    return StateFile(
+        version=state.version,
+        repo_root=state.repo_root,
+        worktrees=new_worktrees,
+    )
+
+
 def reconcileState(
     state: StateFile, git_worktrees: list[dict[str, str]], project_name: str
 ) -> StateFile:
     """Remove orphaned entries, add untracked worktrees."""
     git_paths = {wt["worktree"] for wt in git_worktrees}
 
-    # remove orphaned
+    # remove orphaned (keep archived entries whose directory still exists)
     new_worktrees: dict[str, dict[str, str]] = {}
     for name, info in state.worktrees.items():
-        if info.get("path") in git_paths:
+        in_git = info.get("path") in git_paths
+        archived_on_disk = info.get("archived") and Path(info.get("path", "")).exists()
+        if in_git or archived_on_disk:
             new_worktrees[name] = info
 
     # add untracked (worktrees in global dir not in state)

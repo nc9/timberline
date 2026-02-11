@@ -398,3 +398,121 @@ def test_init_auto_launch_flag(repo_dir: Path):
     assert result.exit_code == 0
     cfg = loadConfig(repo_dir)
     assert cfg.agent.auto_launch is True
+
+
+# ─── done / unarchive tests ──────────────────────────────────────────────────
+
+
+def test_done_archives_worktree(repo_dir: Path):
+    """tl done --force archives worktree, hides from ls, directory persists."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["new", "obsidian", "--no-init"])
+
+    result = runner.invoke(app, ["done", "--name", "obsidian", "--force"])
+    assert result.exit_code == 0
+    assert "Archived" in result.output
+
+    # hidden from regular ls
+    result = runner.invoke(app, ["ls"])
+    assert "obsidian" not in result.output
+
+    # directory still exists
+    from timberline.models import getWorktreeBasePath, resolveProjectName
+
+    project = resolveProjectName(repo_dir, repo_dir.name)
+    assert (getWorktreeBasePath(project) / "obsidian").exists()
+
+
+def test_done_with_name_flag(repo_dir: Path):
+    """tl done --name works."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["new", "alpha", "--no-init"])
+
+    result = runner.invoke(app, ["done", "--name", "alpha", "--force"])
+    assert result.exit_code == 0
+    assert "Archived" in result.output
+    # stdout should contain repo root for shell cd
+    assert str(repo_dir) in result.output
+
+
+def test_ls_archived_shows_archived(repo_dir: Path):
+    """tl ls --archived shows only archived worktrees."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["new", "alpha", "--no-init"])
+    runner.invoke(app, ["new", "beta", "--no-init"])
+    runner.invoke(app, ["done", "--name", "alpha", "--force"])
+
+    result = runner.invoke(app, ["ls", "--archived"])
+    assert result.exit_code == 0
+    assert "alpha" in result.output
+    assert "beta" not in result.output
+
+
+def test_unarchive_restores_worktree(repo_dir: Path):
+    """tl unarchive restores worktree to active."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["new", "obsidian", "--no-init"])
+    runner.invoke(app, ["done", "--name", "obsidian", "--force"])
+
+    result = runner.invoke(app, ["unarchive", "obsidian"])
+    assert result.exit_code == 0
+    assert "Unarchived" in result.output
+
+    # visible in ls again
+    result = runner.invoke(app, ["ls"])
+    assert "obsidian" in result.output
+
+
+def test_rm_on_archived_worktree(repo_dir: Path):
+    """tl rm on archived worktree still works (full removal)."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["new", "obsidian", "--no-init"])
+    runner.invoke(app, ["done", "--name", "obsidian", "--force"])
+
+    result = runner.invoke(app, ["rm", "obsidian"])
+    assert result.exit_code == 0
+    assert "Removed" in result.output
+
+    # gone from archived ls too
+    result = runner.invoke(app, ["ls", "--archived"])
+    assert "obsidian" not in result.output
+
+
+def test_done_unlinks_agent_session(repo_dir: Path):
+    """tl done calls unlinkProjectSession when config enabled."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["config", "set", "agent.link_project_session", "true"])
+    runner.invoke(app, ["new", "obsidian", "--no-init"])
+
+    with patch("timberline.cli.unlinkProjectSession") as mock_unlink:
+        result = runner.invoke(app, ["done", "--name", "obsidian", "--force"])
+        assert result.exit_code == 0
+        mock_unlink.assert_called_once()
+
+
+def test_unarchive_relinks_agent_session(repo_dir: Path):
+    """tl unarchive calls linkProjectSession when config enabled."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["config", "set", "agent.link_project_session", "true"])
+    runner.invoke(app, ["new", "obsidian", "--no-init"])
+    runner.invoke(app, ["done", "--name", "obsidian", "--force"])
+
+    with patch("timberline.cli.linkProjectSession", return_value=True) as mock_link:
+        result = runner.invoke(app, ["unarchive", "obsidian"])
+        assert result.exit_code == 0
+        mock_link.assert_called_once()
+
+
+def test_shell_init_contains_tldone():
+    """Shell init strings contain tldone and tlunarchive."""
+    result = runner.invoke(app, ["shell-init"])
+    assert result.exit_code == 0
+    assert "tldone" in result.output
+    assert "tlunarchive" in result.output
+
+
+def test_help_shows_done_unarchive():
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "done" in result.output
+    assert "unarchive" in result.output

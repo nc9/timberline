@@ -7,6 +7,8 @@ _BASH_INIT = """\
 # Timberline shell integration
 tlcd() { cd "$(tl cd "$1")" || return 1; }
 tln() { local d; d="$(tl new "$@")" && cd "$d" || return 1; }
+tldone() { local d; d="$(tl done "$@")" && cd "$d" || return 1; }
+tlunarchive() { local d; d="$(tl unarchive "$@")" && cd "$d" || return 1; }
 
 tl-prompt() {
     if [ -n "$TL_WORKTREE" ]; then
@@ -21,6 +23,8 @@ _ZSH_INIT = """\
 # Timberline shell integration
 tlcd() { cd "$(tl cd "$1")" || return 1; }
 tln() { local d; d="$(tl new "$@")" && cd "$d" || return 1; }
+tldone() { local d; d="$(tl done "$@")" && cd "$d" || return 1; }
+tlunarchive() { local d; d="$(tl unarchive "$@")" && cd "$d" || return 1; }
 
 tl-prompt() {
     if [[ -n "$TL_WORKTREE" ]]; then
@@ -39,6 +43,14 @@ end
 
 function tln
     set -l d (tl new $argv); and cd $d; or return 1
+end
+
+function tldone
+    set -l d (tl done $argv); and cd $d; or return 1
+end
+
+function tlunarchive
+    set -l d (tl unarchive $argv); and cd $d; or return 1
 end
 
 function tl-prompt

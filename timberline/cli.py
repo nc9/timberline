@@ -67,10 +67,12 @@ from timberline.shell import (
 from timberline.state import loadState, saveState, updateWorktreeBranch
 from timberline.submodules import hasSubmodules, initSubmodules
 from timberline.worktree import (
+    archiveWorktreeDomain,
     createWorktree,
     getWorktree,
     listWorktrees,
     removeWorktree,
+    unarchiveWorktreeDomain,
 )
 
 
@@ -407,11 +409,14 @@ def create_cmd(
 def ls_cmd(
     json_output: Annotated[bool, typer.Option("--json", help="JSON output")] = False,
     paths: Annotated[bool, typer.Option("--paths", help="Paths only")] = False,
+    archived: Annotated[bool, typer.Option("--archived", help="Show archived worktrees")] = False,
 ) -> None:
     """List worktrees."""
     repo_root = _resolveRoot()
     config = _loadCfg(repo_root)
-    worktrees = listWorktrees(repo_root, config)
+    worktrees = listWorktrees(repo_root, config, include_archived=archived)
+    if archived:
+        worktrees = [wt for wt in worktrees if wt.archived]
 
     if json_output:
         printWorktreeJson(worktrees)
@@ -425,9 +430,10 @@ def ls_cmd(
 def list_cmd(
     json_output: Annotated[bool, typer.Option("--json")] = False,
     paths: Annotated[bool, typer.Option("--paths")] = False,
+    archived: Annotated[bool, typer.Option("--archived")] = False,
 ) -> None:
     """Alias for `tl ls`."""
-    ls_cmd(json_output, paths)
+    ls_cmd(json_output, paths, archived)
 
 
 # ─── rm / remove ───────────────────────────────────────────────────────────────
@@ -507,6 +513,73 @@ def cd_cmd(
         os.execve(user_shell, [user_shell], {**env, "PWD": wt.path})
     else:
         print(wt.path)
+
+
+# ─── done ──────────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def done(
+    name: Annotated[str | None, typer.Option("--name", "-n", help="Worktree name")] = None,
+    force: Annotated[bool, typer.Option("--force", "-f", help="Skip safety checks")] = False,
+) -> None:
+    """Archive current worktree and print repo root for cd."""
+    repo_root = _resolveRoot()
+    config = _loadCfg(repo_root)
+    wt = _resolveWorktree(repo_root, config, name)
+    wt_path = Path(wt.path)
+
+    if not force:
+        from timberline.git import hasTrackedChanges
+
+        if hasTrackedChanges(wt_path):
+            printWarning(f"'{wt.name}' has uncommitted changes")
+            if not typer.confirm("Archive anyway?", default=False):
+                raise typer.Exit(1)
+
+        ahead, _ = getAheadBehind(wt.branch, wt.base_branch or config.base_branch, wt_path)
+        if ahead > 0:
+            printWarning(f"'{wt.name}' has {ahead} unpushed commit{'s' if ahead != 1 else ''}")
+            if not typer.confirm("Archive anyway?", default=False):
+                raise typer.Exit(1)
+
+    # unlink agent session
+    if config.agent.link_project_session:
+        unlinkProjectSession(config.default_agent, wt_path)
+
+    try:
+        archiveWorktreeDomain(repo_root, config, wt.name)
+    except TimberlineError as e:
+        printError(str(e))
+        raise typer.Exit(1) from e
+
+    printSuccess(f"Archived {wt.name}")
+    print(str(repo_root))
+
+
+# ─── unarchive ─────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def unarchive(
+    name: Annotated[str, typer.Argument(help="Worktree name")],
+) -> None:
+    """Restore an archived worktree."""
+    repo_root = _resolveRoot()
+    config = _loadCfg(repo_root)
+
+    try:
+        wt = unarchiveWorktreeDomain(repo_root, config, name)
+    except TimberlineError as e:
+        printError(str(e))
+        raise typer.Exit(1) from e
+
+    # re-link agent session
+    if config.agent.link_project_session:
+        linkProjectSession(config.default_agent, Path(wt.path), repo_root)
+
+    printSuccess(f"Unarchived {wt.name}")
+    print(wt.path)
 
 
 # ─── status ────────────────────────────────────────────────────────────────────

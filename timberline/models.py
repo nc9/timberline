@@ -148,6 +148,7 @@ class WorktreeInfo:
     status: str = ""
     ahead: int = 0
     behind: int = 0
+    archived: str = ""  # ISO timestamp when archived, "" = active
 
 
 @dataclass(frozen=True)

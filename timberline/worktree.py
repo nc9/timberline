@@ -27,6 +27,12 @@ from timberline.state import (
     removeWorktreeFromState,
     saveState,
 )
+from timberline.state import (
+    archiveWorktree as archiveWorktreeState,
+)
+from timberline.state import (
+    unarchiveWorktree as unarchiveWorktreeState,
+)
 
 
 def _projectName(config: TimberlineConfig, repo_root: Path) -> str:
@@ -136,8 +142,10 @@ def removeWorktree(
     saveState(project_name, state)
 
 
-def listWorktrees(repo_root: Path, config: TimberlineConfig) -> list[WorktreeInfo]:
-    """List all managed worktrees, reconciling state with git."""
+def listWorktrees(
+    repo_root: Path, config: TimberlineConfig, *, include_archived: bool = False
+) -> list[WorktreeInfo]:
+    """List managed worktrees. Excludes archived unless include_archived=True."""
     project_name = _projectName(config, repo_root)
     state = loadState(project_name, repo_root)
     git_wts = listWorktreesRaw(repo_root)
@@ -147,9 +155,15 @@ def listWorktrees(repo_root: Path, config: TimberlineConfig) -> list[WorktreeInf
 
     worktrees: list[WorktreeInfo] = []
     for name, data in state.worktrees.items():
+        archived = data.get("archived", "")
+        if archived and not include_archived:
+            continue
+
         wt_path = Path(data.get("path", ""))
         status = ""
-        if wt_path.exists():
+        if archived:
+            status = "archived"
+        elif wt_path.exists():
             short = getStatusShort(wt_path)
             if short:
                 lines = [ln for ln in short.splitlines() if ln.strip()]
@@ -166,14 +180,52 @@ def listWorktrees(repo_root: Path, config: TimberlineConfig) -> list[WorktreeInf
                 path=data.get("path", ""),
                 created_at=data.get("created_at", ""),
                 status=status,
+                archived=archived,
             )
         )
 
     return sorted(worktrees, key=lambda w: w.name)
 
 
-def getWorktree(repo_root: Path, config: TimberlineConfig, name: str) -> WorktreeInfo | None:
-    for wt in listWorktrees(repo_root, config):
+def getWorktree(
+    repo_root: Path, config: TimberlineConfig, name: str, *, include_archived: bool = True
+) -> WorktreeInfo | None:
+    for wt in listWorktrees(repo_root, config, include_archived=include_archived):
         if wt.name == name:
             return wt
     return None
+
+
+def archiveWorktreeDomain(repo_root: Path, config: TimberlineConfig, name: str) -> WorktreeInfo:
+    """Archive a worktree (soft-remove). Returns the WorktreeInfo."""
+    project_name = _projectName(config, repo_root)
+    wt = getWorktree(repo_root, config, name, include_archived=True)
+    if not wt:
+        raise TimberlineError(f"Worktree '{name}' not found")
+    if wt.archived:
+        raise TimberlineError(f"Worktree '{name}' is already archived")
+
+    now = datetime.now(UTC).isoformat()
+    state = loadState(project_name, repo_root)
+    state = archiveWorktreeState(state, name, now)
+    saveState(project_name, state)
+
+    wt.archived = now
+    return wt
+
+
+def unarchiveWorktreeDomain(repo_root: Path, config: TimberlineConfig, name: str) -> WorktreeInfo:
+    """Unarchive a worktree. Returns the WorktreeInfo."""
+    project_name = _projectName(config, repo_root)
+    wt = getWorktree(repo_root, config, name, include_archived=True)
+    if not wt:
+        raise TimberlineError(f"Worktree '{name}' not found")
+    if not wt.archived:
+        raise TimberlineError(f"Worktree '{name}' is not archived")
+
+    state = loadState(project_name, repo_root)
+    state = unarchiveWorktreeState(state, name)
+    saveState(project_name, state)
+
+    wt.archived = ""
+    return wt

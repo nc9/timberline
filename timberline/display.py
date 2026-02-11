@@ -28,9 +28,16 @@ def printWorktreeTable(worktrees: list[WorktreeInfo]) -> None:
 
     for wt in worktrees:
         status = wt.status or "clean"
-        style = "green" if status == "clean" else "yellow"
+        if wt.archived:
+            style = "dim"
+        elif status == "clean":
+            style = "green"
+        else:
+            style = "yellow"
         age = formatAge(wt.created_at) if wt.created_at else ""
-        table.add_row(wt.name, wt.branch, f"[{style}]{status}[/{style}]", age)
+        name_str = f"[dim]{wt.name}[/dim]" if wt.archived else wt.name
+        branch_str = f"[dim]{wt.branch}[/dim]" if wt.archived else wt.branch
+        table.add_row(name_str, branch_str, f"[{style}]{status}[/{style}]", age)
 
     _console.print(table)
 

@@ -125,6 +125,15 @@ def getAheadBehind(branch: str, base: str, cwd: Path) -> tuple[int, int]:
     return 0, 0
 
 
+def isBranchMerged(branch: str, remote_base: str, cwd: Path) -> bool:
+    """Tree-content check for squash-merge detection."""
+    try:
+        runGit("diff", "--quiet", remote_base, branch, cwd=cwd)
+        return True  # exit 0 = identical trees
+    except TimberlineError:
+        return False  # diff exists OR git error (offline, missing ref)
+
+
 def renameBranch(old: str, new: str, cwd: Path | None = None) -> None:
     runGit("branch", "-m", old, new, cwd=cwd)
 

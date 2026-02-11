@@ -43,6 +43,7 @@ from timberline.git import (
     getAheadBehind,
     getCurrentBranch,
     getDefaultBranch,
+    isBranchMerged,
     renameBranch,
     resolveUser,
     runGit,
@@ -254,10 +255,10 @@ def init(
     if link_session is not None:
         resolved_link_session = link_session
     elif defaults:
-        resolved_link_session = True
+        resolved_link_session = False
     else:
         resolved_link_session = typer.confirm(
-            "Link agent project sessions across worktrees?", default=True
+            "Link agent project sessions across worktrees?", default=False
         )
 
     # auto-launch agent
@@ -539,9 +540,14 @@ def done(
 
         ahead, _ = getAheadBehind(wt.branch, wt.base_branch or config.base_branch, wt_path)
         if ahead > 0:
-            printWarning(f"'{wt.name}' has {ahead} unpushed commit{'s' if ahead != 1 else ''}")
-            if not typer.confirm("Archive anyway?", default=False):
-                raise typer.Exit(1)
+            base = wt.base_branch or config.base_branch
+            with contextlib.suppress(TimberlineError):
+                runGit("fetch", "origin", base, cwd=wt_path)
+
+            if not isBranchMerged(wt.branch, f"origin/{base}", wt_path):
+                printWarning(f"'{wt.name}' has {ahead} unpushed commit{'s' if ahead != 1 else ''}")
+                if not typer.confirm("Archive anyway?", default=False):
+                    raise typer.Exit(1)
 
     # unlink agent session
     if config.agent.link_project_session:

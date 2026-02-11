@@ -360,14 +360,14 @@ def test_rm_no_unlink_when_config_disabled(repo_dir: Path):
 # ─── Init prompt/flag tests ──────────────────────────────────────────────────
 
 
-def test_init_defaults_sets_link_session_true(repo_dir: Path):
-    """--defaults sets link_project_session=true."""
+def test_init_defaults_sets_link_session_false(repo_dir: Path):
+    """--defaults sets link_project_session=false."""
     from timberline.config import loadConfig
 
     result = runner.invoke(app, ["init", "--defaults"])
     assert result.exit_code == 0
     cfg = loadConfig(repo_dir)
-    assert cfg.agent.link_project_session is True
+    assert cfg.agent.link_project_session is False
 
 
 def test_init_defaults_sets_auto_launch_false(repo_dir: Path):
@@ -509,6 +509,37 @@ def test_shell_init_contains_tldone():
     assert result.exit_code == 0
     assert "tldone" in result.output
     assert "tlunarchive" in result.output
+
+
+def test_done_skips_warning_squash_merged(repo_dir: Path):
+    """No unpushed warning when branch was squash-merged."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["new", "obsidian", "--no-init"])
+
+    with (
+        patch("timberline.cli.getAheadBehind", return_value=(3, 0)),
+        patch("timberline.cli.isBranchMerged", return_value=True),
+        patch("timberline.cli.runGit"),
+    ):
+        result = runner.invoke(app, ["done", "--name", "obsidian"])
+        assert result.exit_code == 0
+        assert "unpushed" not in result.output
+        assert "Archived" in result.output
+
+
+def test_done_warns_when_not_merged(repo_dir: Path):
+    """Unpushed warning shown when branch not squash-merged."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runner.invoke(app, ["new", "obsidian", "--no-init"])
+
+    with (
+        patch("timberline.cli.getAheadBehind", return_value=(3, 0)),
+        patch("timberline.cli.isBranchMerged", return_value=False),
+        patch("timberline.cli.runGit"),
+    ):
+        result = runner.invoke(app, ["done", "--name", "obsidian"], input="n\n")
+        assert result.exit_code == 1
+        assert "unpushed" in result.output
 
 
 def test_help_shows_done_unarchive():

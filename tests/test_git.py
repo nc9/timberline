@@ -12,6 +12,7 @@ from timberline.git import (
     getCurrentBranch,
     getDefaultBranch,
     getStatusShort,
+    isBranchMerged,
     listWorktreesRaw,
     renameBranch,
     runGit,
@@ -114,3 +115,90 @@ def test_renameBranch(tmp_git_repo: Path):
     assert getCurrentBranch(tmp_git_repo) == "new-branch"
     assert branchExists("new-branch", cwd=tmp_git_repo)
     assert not branchExists("old-branch", cwd=tmp_git_repo)
+
+
+# ─── isBranchMerged tests ────────────────────────────────────────────────────
+
+
+def _run(cmd: str, cwd: Path) -> None:
+    subprocess.run(cmd.split(), cwd=cwd, capture_output=True, check=True)
+
+
+def _setup_remote(tmp_path: Path) -> tuple[Path, Path]:
+    """Create bare remote + clone with initial commit."""
+    bare = tmp_path / "remote.git"
+    bare.mkdir()
+    _run("git init --bare", bare)
+
+    clone = tmp_path / "clone"
+    _run(f"git clone {bare} {clone}", tmp_path)
+    _run("git config user.email test@test.com", clone)
+    _run("git config user.name Test", clone)
+    _run("git checkout -b main", clone)
+    (clone / "README.md").write_text("# init")
+    _run("git add .", clone)
+    _run("git commit -m init", clone)
+    _run("git push -u origin main", clone)
+    return bare, clone
+
+
+def test_isBranchMerged_squash_merged(tmp_path: Path):
+    _, clone = _setup_remote(tmp_path)
+
+    # create feature branch with multiple commits
+    _run("git checkout -b feat/test", clone)
+    (clone / "a.txt").write_text("a")
+    _run("git add .", clone)
+    _run("git commit -m one", clone)
+    (clone / "b.txt").write_text("b")
+    _run("git add .", clone)
+    _run("git commit -m two", clone)
+
+    # squash merge into main and push
+    _run("git checkout main", clone)
+    _run("git merge --squash feat/test", clone)
+    _run("git commit -m squashed", clone)
+    _run("git push origin main", clone)
+
+    # back on feature branch — trees should match
+    _run("git checkout feat/test", clone)
+    assert isBranchMerged("feat/test", "origin/main", clone)
+
+
+def test_isBranchMerged_not_merged(tmp_path: Path):
+    _, clone = _setup_remote(tmp_path)
+
+    _run("git checkout -b feat/test", clone)
+    (clone / "a.txt").write_text("a")
+    _run("git add .", clone)
+    _run("git commit -m one", clone)
+
+    assert not isBranchMerged("feat/test", "origin/main", clone)
+
+
+def test_isBranchMerged_diverged_after_merge(tmp_path: Path):
+    _, clone = _setup_remote(tmp_path)
+
+    _run("git checkout -b feat/test", clone)
+    (clone / "a.txt").write_text("a")
+    _run("git add .", clone)
+    _run("git commit -m one", clone)
+
+    # squash merge
+    _run("git checkout main", clone)
+    _run("git merge --squash feat/test", clone)
+    _run("git commit -m squashed", clone)
+    _run("git push origin main", clone)
+
+    # add extra commit on feature after merge
+    _run("git checkout feat/test", clone)
+    (clone / "c.txt").write_text("c")
+    _run("git add .", clone)
+    _run("git commit -m extra", clone)
+
+    assert not isBranchMerged("feat/test", "origin/main", clone)
+
+
+def test_isBranchMerged_no_remote_ref(tmp_git_repo: Path):
+    """Missing remote ref returns False (safe default)."""
+    assert not isBranchMerged("main", "origin/main", tmp_git_repo)

@@ -38,7 +38,7 @@ uv tool upgrade timberline
 Setup shell aliases
 
 ```bash
-tl install
+tl setup
 ```
 
 ## Quick Start
@@ -84,7 +84,7 @@ Enter a worktree:
 cd $(tl cd auth-refactor)       # subshell-friendly
 ```
 
-Or with shell integration (`tl install`):
+Or with shell integration (`tl setup`):
 
 ```bash
 tlcd auth-refactor              # cd directly
@@ -152,7 +152,7 @@ pre_land = "make check"  # or "bun run lint && bun run test", etc.
 | `tl env ls` | List discovered .env files |
 | `tl env diff [name]` | Show .env differences |
 | `tl clean` | Prune stale worktrees. `--dry-run` |
-| `tl install` | Install shell integration into rc file. `--uninstall` |
+| `tl setup` | Install shell integration into rc file. `--uninstall` |
 | `tl shell-init` | Output shell integration script |
 | `tl config show` | Print resolved config |
 | `tl config set <k> <v>` | Set config value |
@@ -197,7 +197,7 @@ link_project_session = false  # symlink worktree agent session to main repo
 
 ```bash
 # Automatic install:
-tl install
+tl setup
 
 # Or manually add to .zshrc / .bashrc:
 eval "$(tl shell-init)"

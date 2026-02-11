@@ -1,31 +1,20 @@
 [timberline]
-worktree_dir = ".tl"
-branch_template = "{user}/{type}/{name}"
+# worktree_dir = ".tl"  # Directory for worktrees (legacy, relative to repo root)
+project_name = "lumberjack"
+# branch_template = "{user}/{type}/{name}"  # Branch name template. Must contain {name}. Vars: {user}, {type}, {name}
 user = "nc9"
-default_type = "feature"
-base_branch = "main"
-naming_scheme = "minerals"
-default_agent = "claude"
+# default_type = "feature"  # Default branch type (feature, fix, hotfix, chore, refactor)
+# base_branch = "main"  # Base branch to create worktrees from
+# naming_scheme = "minerals"
+# default_agent = "claude"  # Coding agent to launch (claude, codex, aider, opencode)
 pre_land = "make check"
 
 [timberline.init]
 init_command = "uv sync"
-auto_init = true
-
-[timberline.env]
-auto_copy = true
-patterns = [
-    ".env",
-    ".env.*",
-    "!.env.example",
-    "!.env.template",
-]
-scan_depth = 3
-
-[timberline.submodules]
-auto_init = true
-recursive = true
+# auto_init = true  # Auto-run init_command when creating worktrees
+# post_init = []  # Additional commands to run after init_command
 
 [timberline.agent]
-auto_launch = false
-inject_context = true
+auto_launch = true
+# inject_context = true  # Inject worktree context file for the agent
+link_project_session = true

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from timberline.git import (
     branchExists,
+    fetchBranch,
     getStatusShort,
     hasTrackedChanges,
     listWorktreesRaw,
@@ -104,6 +105,61 @@ def createWorktree(
     return info
 
 
+def deriveName(branch: str) -> str:
+    """Extract worktree name from branch: last `/`-separated segment."""
+    return branch.rsplit("/", 1)[-1]
+
+
+def checkoutWorktree(
+    repo_root: Path,
+    config: TimberlineConfig,
+    branch: str,
+    name: str | None = None,
+    base_branch: str | None = None,
+    pr: int = 0,
+) -> WorktreeInfo:
+    """Create worktree from existing branch. Returns WorktreeInfo."""
+    project_name = _projectName(config, repo_root)
+
+    if not name:
+        name = deriveName(branch)
+
+    wt_path = getWorktreeBasePath(project_name) / name
+    if wt_path.exists():
+        raise TimberlineError(f"Worktree '{name}' already exists at {wt_path}")
+
+    # try fetch from remote, fall back to local branch check
+    try:
+        fetchBranch(branch, cwd=repo_root)
+    except TimberlineError:
+        if not branchExists(branch, cwd=repo_root):
+            raise TimberlineError(f"Branch '{branch}' not found locally or on remote") from None
+
+    # ensure project dir + repo_root marker
+    writeRepoRootMarker(project_name, repo_root)
+
+    # create worktree from existing branch (no -b)
+    runGit("worktree", "add", str(wt_path), branch, cwd=repo_root)
+
+    now = datetime.now(UTC).isoformat()
+    info = WorktreeInfo(
+        name=name,
+        branch=branch,
+        base_branch=base_branch or config.base_branch,
+        type="",
+        path=str(wt_path),
+        created_at=now,
+        pr=pr,
+    )
+
+    # update state
+    state = loadState(project_name, repo_root)
+    state = addWorktreeToState(state, info)
+    saveState(project_name, state)
+
+    return info
+
+
 def removeWorktree(
     repo_root: Path,
     config: TimberlineConfig,
@@ -180,6 +236,7 @@ def listWorktrees(
                 path=data.get("path", ""),
                 created_at=data.get("created_at", ""),
                 status=status,
+                pr=int(data.get("pr", 0)),
                 archived=archived,
             )
         )

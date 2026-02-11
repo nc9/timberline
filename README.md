@@ -11,7 +11,7 @@ Git worktree manager for parallel coding agent development.
 - **Auto-copy .env files** — glob-based discovery with include/exclude patterns, sync & diff commands
 - **Auto-init submodules** — recursive submodule setup on worktree creation
 - **Archive & restore** — `tl done` soft-removes a worktree (keeps directory, marks archived), warns about uncommitted/unpushed work; `tl unarchive` restores it
-- **Shell integration** — `tlcd`, `tln`, `tldone`, `tlunarchive` shell aliases, `tl-prompt` for PS1, auto-install for bash/zsh/fish
+- **Shell integration** — `tlcd`, `tln`, `tlh`, `tld`, `tlunarchive` shell aliases, `tl-prompt` for PS1, auto-install for bash/zsh/fish
 - **Creative naming schemes** — minerals, cities, or compound names for auto-named worktrees
 - **Branch templates** — configurable `{user}/{type}/{name}` patterns for consistent naming
 - **Land workflow** — pre-land checks → push → PR creation in one command
@@ -52,7 +52,7 @@ tl new --type fix           # auto-named fix worktree
 tl ls                       # list all worktrees
 tlcd auth-refactor          # jump into worktree
 tl land                     # run checks, push, and create PR
-tldone                      # archive worktree + cd back to main repo
+tld                         # archive worktree + cd back to main repo
 tl rm auth-refactor         # full removal (or skip if archived)
 ```
 
@@ -138,7 +138,7 @@ pre_land = "make check"  # or "bun run lint && bun run test", etc.
 When you're done with a worktree but want to keep it around (e.g. waiting for PR review), use `tl done` to archive it:
 
 ```bash
-tldone                          # archive current worktree + cd back to repo root
+tld                             # archive current worktree + cd back to repo root
 tl done --name auth-refactor    # archive by name
 tl done --force                 # skip uncommitted/unpushed warnings
 ```
@@ -168,6 +168,7 @@ tlunarchive auth-refactor       # restore + cd into it
 | `tl done [--name]` | Archive worktree, print repo root. `--force` |
 | `tl unarchive <name>` | Restore archived worktree |
 | `tl rm <name>` | Remove worktree (aliases: `remove`). `--force`, `--keep-branch`, `--all` |
+| `tl home` | Print repo root path |
 | `tl cd <name>` | Print worktree path. `--shell` for subshell |
 | `tl status` | Git status across all worktrees |
 | `tl sync [name]` | Rebase/merge on base branch. `--all`, `--merge` |
@@ -239,7 +240,8 @@ Installed by `tl setup` (bash/zsh/fish):
 |-------|-------------|
 | `tln [args]` | Create worktree + cd into it (`tl new` wrapper) |
 | `tlcd <name>` | cd into a worktree |
-| `tldone [args]` | Archive current worktree + cd back to repo root |
+| `tlh` | cd to repo root |
+| `tld [args]` | Archive current worktree + cd back to repo root |
 | `tlunarchive <name>` | Restore archived worktree + cd into it |
 | `tl-prompt` | Print worktree name for PS1 prompt integration |
 

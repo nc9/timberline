@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from timberline.git import (
     branchExists,
+    fetchBranch,
     findRepoRoot,
     getAheadBehind,
     getCurrentBranch,
@@ -15,6 +17,7 @@ from timberline.git import (
     isBranchMerged,
     listWorktreesRaw,
     renameBranch,
+    resolvePrBranch,
     runGit,
 )
 from timberline.models import TimberlineError
@@ -202,3 +205,37 @@ def test_isBranchMerged_diverged_after_merge(tmp_path: Path):
 def test_isBranchMerged_no_remote_ref(tmp_git_repo: Path):
     """Missing remote ref returns False (safe default)."""
     assert not isBranchMerged("main", "origin/main", tmp_git_repo)
+
+
+# ─── fetchBranch tests ────────────────────────────────────────────────────────
+
+
+def test_fetchBranch_no_remote(tmp_git_repo: Path):
+    """fetchBranch raises TimberlineError when no remote exists."""
+    with pytest.raises(TimberlineError):
+        fetchBranch("main", cwd=tmp_git_repo)
+
+
+# ─── resolvePrBranch tests ───────────────────────────────────────────────────
+
+
+def test_resolvePrBranch_mock():
+    """resolvePrBranch returns head/base from gh CLI output."""
+    mock_result = subprocess.CompletedProcess(
+        args=[],
+        returncode=0,
+        stdout='{"headRefName":"feat/auth","baseRefName":"main"}',
+    )
+    with patch("subprocess.run", return_value=mock_result):
+        head, base = resolvePrBranch(42)
+        assert head == "feat/auth"
+        assert base == "main"
+
+
+def test_resolvePrBranch_gh_not_found():
+    """resolvePrBranch raises TimberlineError when gh not found."""
+    with (
+        patch("subprocess.run", side_effect=FileNotFoundError),
+        pytest.raises(TimberlineError, match="PR #99"),
+    ):
+        resolvePrBranch(99)

@@ -78,8 +78,8 @@ def printStatusList(worktrees: list[WorktreeInfo]) -> None:
         _console.print(f"  {icon} {wt.name:<20} {status:<12} {ahead_behind}")
 
 
-def printCreateSummary(info: WorktreeInfo, steps: list[str]) -> None:
-    _console.print(f"\n[bold green]✓[/bold green] Created worktree: [bold]{info.name}[/bold]")
+def printCreateSummary(info: WorktreeInfo, steps: list[str], *, verb: str = "Created") -> None:
+    _console.print(f"\n[bold green]✓[/bold green] {verb} worktree: [bold]{info.name}[/bold]")
     _console.print(f"  Branch: {info.branch}")
     _console.print(f"  Path:   {info.path}")
     for step in steps:

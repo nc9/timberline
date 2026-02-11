@@ -144,3 +144,25 @@ def branchExists(name: str, cwd: Path | None = None) -> bool:
         return True
     except TimberlineError:
         return False
+
+
+def fetchBranch(branch: str, remote: str = "origin", cwd: Path | None = None) -> None:
+    runGit("fetch", remote, branch, cwd=cwd)
+
+
+def resolvePrBranch(pr_number: int, cwd: Path | None = None) -> tuple[str, str]:
+    """Resolve PR head/base branches via gh CLI. Returns (head_branch, base_branch)."""
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "view", str(pr_number), "--json", "headRefName,baseRefName"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        import json
+
+        data = json.loads(result.stdout)
+        return data["headRefName"], data["baseRefName"]
+    except (subprocess.CalledProcessError, FileNotFoundError, KeyError) as e:
+        raise TimberlineError(f"Failed to resolve PR #{pr_number} (is gh CLI installed?)") from e

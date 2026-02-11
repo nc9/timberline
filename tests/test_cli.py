@@ -7,6 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from timberline.cli import app
+from timberline.git import runGit
 from timberline.models import getProjectDir
 
 runner = CliRunner()
@@ -503,11 +504,12 @@ def test_unarchive_relinks_agent_session(repo_dir: Path):
         mock_link.assert_called_once()
 
 
-def test_shell_init_contains_tldone():
-    """Shell init strings contain tldone and tlunarchive."""
+def test_shell_init_contains_aliases():
+    """Shell init strings contain tld, tlh, and tlunarchive."""
     result = runner.invoke(app, ["shell-init"])
     assert result.exit_code == 0
-    assert "tldone" in result.output
+    assert "tld()" in result.output or "function tld" in result.output
+    assert "tlh()" in result.output or "function tlh" in result.output
     assert "tlunarchive" in result.output
 
 
@@ -547,3 +549,124 @@ def test_help_shows_done_unarchive():
     assert result.exit_code == 0
     assert "done" in result.output
     assert "unarchive" in result.output
+    assert "home" in result.output
+
+
+def test_home_prints_repo_root(repo_dir: Path):
+    result = runner.invoke(app, ["home"])
+    assert result.exit_code == 0
+    assert str(repo_dir) in result.output
+
+
+# ─── checkout / co tests ─────────────────────────────────────────────────────
+
+
+def test_checkout_local_branch(repo_dir: Path):
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runGit("branch", "feature/login", cwd=repo_dir)
+
+    result = runner.invoke(app, ["checkout", "feature/login", "--no-init"])
+    assert result.exit_code == 0
+    assert "Checked out" in result.output
+    assert "login" in result.output
+
+
+def test_checkout_with_name_override(repo_dir: Path):
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runGit("branch", "feature/login", cwd=repo_dir)
+
+    result = runner.invoke(app, ["checkout", "feature/login", "--name", "myname", "--no-init"])
+    assert result.exit_code == 0
+    assert "myname" in result.output
+
+
+def test_checkout_pr_hash_syntax(repo_dir: Path):
+    """#42 positional arg parsed as PR number."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+
+    with patch("timberline.cli.resolvePrBranch", return_value=("feat/pr-branch", "main")):
+        runGit("branch", "feat/pr-branch", cwd=repo_dir)
+        result = runner.invoke(app, ["checkout", "#42", "--no-init"])
+        assert result.exit_code == 0
+        assert "Checked out" in result.output
+
+
+def test_checkout_pr_flag(repo_dir: Path):
+    """--pr flag works."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+
+    with patch("timberline.cli.resolvePrBranch", return_value=("feat/pr-flag", "main")):
+        runGit("branch", "feat/pr-flag", cwd=repo_dir)
+        result = runner.invoke(app, ["checkout", "--pr", "99", "--no-init"])
+        assert result.exit_code == 0
+        assert "Checked out" in result.output
+
+
+def test_checkout_both_pr_args_error(repo_dir: Path):
+    """#N and --pr together is an error."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    result = runner.invoke(app, ["checkout", "#42", "--pr", "99"])
+    assert result.exit_code == 1
+    assert "not both" in result.output
+
+
+def test_checkout_no_args_error(repo_dir: Path):
+    """No branch or PR is an error."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    result = runner.invoke(app, ["checkout"])
+    assert result.exit_code == 1
+    assert "Specify" in result.output
+
+
+def test_co_alias(repo_dir: Path):
+    """co alias works same as checkout."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runGit("branch", "feature/alias-test", cwd=repo_dir)
+
+    result = runner.invoke(app, ["co", "feature/alias-test", "--no-init"])
+    assert result.exit_code == 0
+    assert "Checked out" in result.output
+
+
+def test_checkout_shows_in_ls(repo_dir: Path):
+    """Checked out worktree appears in ls."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+    runGit("branch", "feature/visible", cwd=repo_dir)
+
+    runner.invoke(app, ["checkout", "feature/visible", "--no-init"])
+    result = runner.invoke(app, ["ls"])
+    assert result.exit_code == 0
+    assert "visible" in result.output
+
+
+def test_checkout_pr_aware_push(repo_dir: Path):
+    """PR-aware push skips gh pr create when wt.pr is set."""
+    runner.invoke(app, ["init", "--defaults", "--user", "test"])
+
+    with patch("timberline.cli.resolvePrBranch", return_value=("feat/pr-push", "main")):
+        runGit("branch", "feat/pr-push", cwd=repo_dir)
+        runner.invoke(app, ["checkout", "#42", "--no-init"])
+
+    with (
+        patch("timberline.cli.runGit"),
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "https://github.com/org/repo/pull/42"
+        runner.invoke(app, ["pr", "--name", "pr-push"])
+        # should NOT try gh pr create — should push + show existing PR
+        for call in mock_run.call_args_list:
+            args = call[0][0] if call[0] else call[1].get("args", [])
+            assert "create" not in args
+
+
+def test_help_shows_checkout():
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "checkout" in result.output
+
+
+def test_shell_init_contains_tlc():
+    result = runner.invoke(app, ["shell-init"])
+    assert result.exit_code == 0
+    assert "tlc()" in result.output or "function tlc" in result.output

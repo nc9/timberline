@@ -148,6 +148,7 @@ class WorktreeInfo:
     status: str = ""
     ahead: int = 0
     behind: int = 0
+    pr: int = 0  # PR number if checked out from PR, 0 = not from PR
     archived: str = ""  # ISO timestamp when archived, "" = active
 
 

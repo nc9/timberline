@@ -38,13 +38,16 @@ def saveState(project_name: str, state: StateFile) -> None:
 
 def addWorktreeToState(state: StateFile, info: WorktreeInfo) -> StateFile:
     new_worktrees = dict(state.worktrees)
-    new_worktrees[info.name] = {
+    entry: dict[str, str] = {
         "branch": info.branch,
         "base_branch": info.base_branch,
         "type": info.type,
         "created_at": info.created_at,
         "path": info.path,
     }
+    if info.pr:
+        entry["pr"] = str(info.pr)
+    new_worktrees[info.name] = entry
     return StateFile(
         version=state.version,
         repo_root=state.repo_root,

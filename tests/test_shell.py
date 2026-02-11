@@ -18,6 +18,9 @@ def test_generateShellInit_bash():
     out = generateShellInit("bash")
     assert "tlcd()" in out
     assert "tln()" in out
+    assert "tlc()" in out
+    assert "tlh()" in out
+    assert "tld()" in out
     assert "tl-prompt()" in out
 
 
@@ -25,6 +28,9 @@ def test_generateShellInit_zsh():
     out = generateShellInit("zsh")
     assert "tlcd()" in out
     assert "tln()" in out
+    assert "tlc()" in out
+    assert "tlh()" in out
+    assert "tld()" in out
     assert "[[ -n" in out
     assert ".timberline/projects/" in out
 
@@ -33,6 +39,9 @@ def test_generateShellInit_fish():
     out = generateShellInit("fish")
     assert "function tlcd" in out
     assert "function tln" in out
+    assert "function tlc" in out
+    assert "function tlh" in out
+    assert "function tld" in out
     assert "function tl-prompt" in out
 
 

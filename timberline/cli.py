@@ -45,6 +45,7 @@ from timberline.git import (
     getDefaultBranch,
     isBranchMerged,
     renameBranch,
+    resolvePrBranch,
     resolveUser,
     runGit,
 )
@@ -69,6 +70,7 @@ from timberline.state import loadState, saveState, updateWorktreeBranch
 from timberline.submodules import hasSubmodules, initSubmodules
 from timberline.worktree import (
     archiveWorktreeDomain,
+    checkoutWorktree,
     createWorktree,
     getWorktree,
     listWorktrees,
@@ -146,12 +148,27 @@ def _resolveWorktree(repo_root: Path, config: TimberlineConfig, name: str | None
 def _pushAndCreatePr(
     wt: WorktreeInfo, config: TimberlineConfig, draft: bool, wt_path: Path
 ) -> None:
-    """Push branch and create PR via gh CLI."""
+    """Push branch and create PR via gh CLI. Skips PR creation if already from a PR."""
     try:
         runGit("push", "-u", "origin", wt.branch, cwd=wt_path)
     except TimberlineError as e:
         printError(f"Push failed: {e}")
         raise typer.Exit(1) from e
+
+    # PR already exists — just show the URL
+    if wt.pr:
+        try:
+            result = subprocess.run(
+                ["gh", "pr", "view", str(wt.pr), "--json", "url", "--jq", ".url"],
+                cwd=wt_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            printSuccess(f"Pushed to existing PR: {result.stdout.strip()}")
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            printSuccess(f"Pushed (PR #{wt.pr})")
+        return
 
     cmd = [
         "gh",
@@ -312,34 +329,21 @@ def init(
     printSuccess("Ready — run `tl new` to create your first worktree")
 
 
-# ─── new / create ─────────────────────────────────────────────────────────────
+# ─── shared post-create setup ─────────────────────────────────────────────────
 
 
-@app.command("new")
-def new_cmd(
-    name: Annotated[str | None, typer.Argument(help="Worktree name")] = None,
-    type_: Annotated[str | None, typer.Option("--type", "-t", help="Branch type")] = None,
-    branch: Annotated[str | None, typer.Option("--branch", "-b", help="Explicit branch")] = None,
-    base: Annotated[str | None, typer.Option("--from", help="Base branch")] = None,
-    no_init: Annotated[bool, typer.Option("--no-init", help="Skip dependency install")] = False,
-    no_env: Annotated[bool, typer.Option("--no-env", help="Skip .env copy")] = False,
-    no_submodules: Annotated[
-        bool, typer.Option("--no-submodules", help="Skip submodule init")
-    ] = False,
-    agent: Annotated[bool, typer.Option("--agent", help="Launch coding agent after")] = False,
-    no_link: Annotated[bool, typer.Option("--no-link", help="Skip agent session linking")] = False,
-) -> None:
-    """Create a new worktree."""
-    repo_root = _resolveRoot()
-    config = _loadCfg(repo_root)
+def _postCreateSetup(
+    repo_root: Path,
+    config: TimberlineConfig,
+    info: WorktreeInfo,
+    *,
+    no_init: bool,
+    no_env: bool,
+    no_submodules: bool,
+    no_link: bool,
+) -> list[str]:
+    """Run env copy, submodules, deps, agent context, session linking. Returns step descriptions."""
     steps: list[str] = []
-
-    try:
-        info = createWorktree(repo_root, config, name=name, branch=branch, base=base, type_=type_)
-    except TimberlineError as e:
-        printError(str(e))
-        raise typer.Exit(1) from e
-
     wt_path = Path(info.path)
 
     # env files
@@ -375,6 +379,46 @@ def new_cmd(
         if linked:
             steps.append("Linked agent session")
 
+    return steps
+
+
+# ─── new / create ─────────────────────────────────────────────────────────────
+
+
+@app.command("new")
+def new_cmd(
+    name: Annotated[str | None, typer.Argument(help="Worktree name")] = None,
+    type_: Annotated[str | None, typer.Option("--type", "-t", help="Branch type")] = None,
+    branch: Annotated[str | None, typer.Option("--branch", "-b", help="Explicit branch")] = None,
+    base: Annotated[str | None, typer.Option("--from", help="Base branch")] = None,
+    no_init: Annotated[bool, typer.Option("--no-init", help="Skip dependency install")] = False,
+    no_env: Annotated[bool, typer.Option("--no-env", help="Skip .env copy")] = False,
+    no_submodules: Annotated[
+        bool, typer.Option("--no-submodules", help="Skip submodule init")
+    ] = False,
+    agent: Annotated[bool, typer.Option("--agent", help="Launch coding agent after")] = False,
+    no_link: Annotated[bool, typer.Option("--no-link", help="Skip agent session linking")] = False,
+) -> None:
+    """Create a new worktree."""
+    repo_root = _resolveRoot()
+    config = _loadCfg(repo_root)
+
+    try:
+        info = createWorktree(repo_root, config, name=name, branch=branch, base=base, type_=type_)
+    except TimberlineError as e:
+        printError(str(e))
+        raise typer.Exit(1) from e
+
+    steps = _postCreateSetup(
+        repo_root,
+        config,
+        info,
+        no_init=no_init,
+        no_env=no_env,
+        no_submodules=no_submodules,
+        no_link=no_link,
+    )
+
     printCreateSummary(info, steps)
 
     # stdout path for shell function `tln` to capture
@@ -384,7 +428,7 @@ def new_cmd(
     if agent or config.agent.auto_launch:
         agent_def = getAgentDef(config.default_agent, config.agent.context_file)
         env_vars = buildEnvVars(info, repo_root)
-        launchAgent(agent_def, wt_path, env_vars)
+        launchAgent(agent_def, Path(info.path), env_vars)
 
 
 @app.command("create", hidden=True)
@@ -401,6 +445,112 @@ def create_cmd(
 ) -> None:
     """Alias for `tl new`."""
     new_cmd(name, type_, branch, base, no_init, no_env, no_submodules, agent, no_link)
+
+
+# ─── checkout / co ────────────────────────────────────────────────────────────
+
+
+@app.command("checkout")
+def checkout_cmd(
+    branch: Annotated[str | None, typer.Argument(help="Branch name or #PR number")] = None,
+    pr: Annotated[int | None, typer.Option("--pr", help="PR number to checkout")] = None,
+    name: Annotated[str | None, typer.Option("--name", "-n", help="Override worktree name")] = None,
+    base: Annotated[str | None, typer.Option("--from", help="Base branch")] = None,
+    no_init: Annotated[bool, typer.Option("--no-init", help="Skip dependency install")] = False,
+    no_env: Annotated[bool, typer.Option("--no-env", help="Skip .env copy")] = False,
+    no_submodules: Annotated[
+        bool, typer.Option("--no-submodules", help="Skip submodule init")
+    ] = False,
+    agent: Annotated[bool, typer.Option("--agent", help="Launch coding agent after")] = False,
+    no_link: Annotated[bool, typer.Option("--no-link", help="Skip agent session linking")] = False,
+) -> None:
+    """Create a worktree from an existing remote branch or PR."""
+    repo_root = _resolveRoot()
+    config = _loadCfg(repo_root)
+
+    # parse #N shorthand from positional arg
+    pr_from_arg = 0
+    resolved_branch = branch
+    if branch and branch.startswith("#"):
+        try:
+            pr_from_arg = int(branch[1:])
+        except ValueError as e:
+            printError(f"Invalid PR number: {branch}")
+            raise typer.Exit(1) from e
+        resolved_branch = None
+
+    # validate: can't give both #N and --pr
+    if pr_from_arg and pr:
+        printError("Specify PR as #N or --pr, not both")
+        raise typer.Exit(1)
+
+    pr_number = pr_from_arg or pr or 0
+
+    # must have branch or PR
+    if not resolved_branch and not pr_number:
+        printError("Specify a branch name or PR number")
+        raise typer.Exit(1)
+
+    # resolve PR -> branch
+    base_branch = base
+    if pr_number:
+        try:
+            resolved_branch, pr_base = resolvePrBranch(pr_number, cwd=repo_root)
+            if not base_branch:
+                base_branch = pr_base
+        except TimberlineError as e:
+            printError(str(e))
+            raise typer.Exit(1) from e
+
+    try:
+        info = checkoutWorktree(
+            repo_root,
+            config,
+            resolved_branch,  # type: ignore[arg-type]
+            name=name,
+            base_branch=base_branch,
+            pr=pr_number,
+        )
+    except TimberlineError as e:
+        printError(str(e))
+        raise typer.Exit(1) from e
+
+    steps = _postCreateSetup(
+        repo_root,
+        config,
+        info,
+        no_init=no_init,
+        no_env=no_env,
+        no_submodules=no_submodules,
+        no_link=no_link,
+    )
+
+    printCreateSummary(info, steps, verb="Checked out")
+
+    # stdout path for shell function to capture
+    print(info.path)
+
+    # launch agent
+    if agent or config.agent.auto_launch:
+        agent_def = getAgentDef(config.default_agent, config.agent.context_file)
+        env_vars = buildEnvVars(info, repo_root)
+        launchAgent(agent_def, Path(info.path), env_vars)
+
+
+@app.command("co", hidden=True)
+def co_cmd(
+    branch: Annotated[str | None, typer.Argument(help="Branch name or #PR number")] = None,
+    pr: Annotated[int | None, typer.Option("--pr")] = None,
+    name: Annotated[str | None, typer.Option("--name", "-n")] = None,
+    base: Annotated[str | None, typer.Option("--from")] = None,
+    no_init: Annotated[bool, typer.Option("--no-init")] = False,
+    no_env: Annotated[bool, typer.Option("--no-env")] = False,
+    no_submodules: Annotated[bool, typer.Option("--no-submodules")] = False,
+    agent: Annotated[bool, typer.Option("--agent")] = False,
+    no_link: Annotated[bool, typer.Option("--no-link")] = False,
+) -> None:
+    """Alias for `tl checkout`."""
+    checkout_cmd(branch, pr, name, base, no_init, no_env, no_submodules, agent, no_link)
 
 
 # ─── list / ls ─────────────────────────────────────────────────────────────────
@@ -514,6 +664,15 @@ def cd_cmd(
         os.execve(user_shell, [user_shell], {**env, "PWD": wt.path})
     else:
         print(wt.path)
+
+
+# ─── home ─────────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def home() -> None:
+    """Print repo root path (for shell cd)."""
+    print(str(_resolveRoot()))
 
 
 # ─── done ──────────────────────────────────────────────────────────────────────

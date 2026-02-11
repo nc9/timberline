@@ -7,7 +7,9 @@ _BASH_INIT = """\
 # Timberline shell integration
 tlcd() { cd "$(tl cd "$1")" || return 1; }
 tln() { local d; d="$(tl new "$@")" && cd "$d" || return 1; }
-tldone() { local d; d="$(tl done "$@")" && cd "$d" || return 1; }
+tlc() { local d; d="$(tl checkout "$@")" && cd "$d" || return 1; }
+tlh() { cd "$(tl home)" || return 1; }
+tld() { local d; d="$(tl done "$@")" && cd "$d" || return 1; }
 tlunarchive() { local d; d="$(tl unarchive "$@")" && cd "$d" || return 1; }
 
 tl-prompt() {
@@ -23,7 +25,9 @@ _ZSH_INIT = """\
 # Timberline shell integration
 tlcd() { cd "$(tl cd "$1")" || return 1; }
 tln() { local d; d="$(tl new "$@")" && cd "$d" || return 1; }
-tldone() { local d; d="$(tl done "$@")" && cd "$d" || return 1; }
+tlc() { local d; d="$(tl checkout "$@")" && cd "$d" || return 1; }
+tlh() { cd "$(tl home)" || return 1; }
+tld() { local d; d="$(tl done "$@")" && cd "$d" || return 1; }
 tlunarchive() { local d; d="$(tl unarchive "$@")" && cd "$d" || return 1; }
 
 tl-prompt() {
@@ -45,7 +49,15 @@ function tln
     set -l d (tl new $argv); and cd $d; or return 1
 end
 
-function tldone
+function tlc
+    set -l d (tl checkout $argv); and cd $d; or return 1
+end
+
+function tlh
+    cd (tl home); or return 1
+end
+
+function tld
     set -l d (tl done $argv); and cd $d; or return 1
 end
 

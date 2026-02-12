@@ -105,11 +105,6 @@ def createWorktree(
     return info
 
 
-def deriveName(branch: str) -> str:
-    """Extract worktree name from branch: last `/`-separated segment."""
-    return branch.rsplit("/", 1)[-1]
-
-
 def checkoutWorktree(
     repo_root: Path,
     config: TimberlineConfig,
@@ -122,7 +117,9 @@ def checkoutWorktree(
     project_name = _projectName(config, repo_root)
 
     if not name:
-        name = deriveName(branch)
+        state = loadState(project_name, repo_root)
+        existing = set(state.worktrees.keys())
+        name = generateName(config.naming_scheme, existing)
 
     wt_path = getWorktreeBasePath(project_name) / name
     if wt_path.exists():

@@ -568,7 +568,6 @@ def test_checkout_local_branch(repo_dir: Path):
     result = runner.invoke(app, ["checkout", "feature/login", "--no-init"])
     assert result.exit_code == 0
     assert "Checked out" in result.output
-    assert "login" in result.output
 
 
 def test_checkout_with_name_override(repo_dir: Path):
@@ -634,18 +633,26 @@ def test_checkout_shows_in_ls(repo_dir: Path):
     runGit("branch", "feature/visible", cwd=repo_dir)
 
     runner.invoke(app, ["checkout", "feature/visible", "--no-init"])
-    result = runner.invoke(app, ["ls"])
+    result = runner.invoke(app, ["ls", "--json"])
     assert result.exit_code == 0
-    assert "visible" in result.output
+    assert "feature/visible" in result.output
 
 
 def test_checkout_pr_aware_push(repo_dir: Path):
     """PR-aware push skips gh pr create when wt.pr is set."""
+    from timberline.config import loadConfig
+    from timberline.worktree import listWorktrees
+
     runner.invoke(app, ["init", "--defaults", "--user", "test"])
 
     with patch("timberline.cli.resolvePrBranch", return_value=("feat/pr-push", "main")):
         runGit("branch", "feat/pr-push", cwd=repo_dir)
         runner.invoke(app, ["checkout", "#42", "--no-init"])
+
+    # get generated worktree name from state
+    cfg = loadConfig(repo_dir)
+    wts = listWorktrees(repo_dir, cfg)
+    wt_name = wts[0].name
 
     with (
         patch("timberline.cli.runGit"),
@@ -653,7 +660,7 @@ def test_checkout_pr_aware_push(repo_dir: Path):
     ):
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = "https://github.com/org/repo/pull/42"
-        runner.invoke(app, ["pr", "--name", "pr-push"])
+        runner.invoke(app, ["pr", "--name", wt_name])
         # should NOT try gh pr create — should push + show existing PR
         for call in mock_run.call_args_list:
             args = call[0][0] if call[0] else call[1].get("args", [])

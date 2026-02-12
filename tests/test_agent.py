@@ -12,6 +12,7 @@ from timberline.agent import (
     encodeClaudePath,
     getAgentDef,
     injectAgentContext,
+    launchAgent,
     linkProjectSession,
     unlinkProjectSession,
     validateAgentBinary,
@@ -308,3 +309,25 @@ def test_unlinkProjectSession_noop_no_symlink(tmp_path: Path):
 def test_unlinkProjectSession_unknown_agent(tmp_path: Path):
     result = unlinkProjectSession("unknown-agent", tmp_path / "wt")
     assert result is False
+
+
+# ─── launchAgent with command override ────────────────────────────────────────
+
+
+def test_launchAgent_default(tmp_path: Path):
+    """launchAgent without command uses agent binary."""
+    agent = KNOWN_AGENTS["claude"]
+    with patch("timberline.agent.os.execvpe") as mock_exec, patch("timberline.agent.os.chdir"):
+        launchAgent(agent, tmp_path, {})
+        mock_exec.assert_called_once_with("claude", ["claude"], mock_exec.call_args[0][2])
+
+
+def test_launchAgent_custom_command(tmp_path: Path):
+    """launchAgent with command splits and execs the custom command."""
+    agent = KNOWN_AGENTS["claude"]
+    with patch("timberline.agent.os.execvpe") as mock_exec, patch("timberline.agent.os.chdir"):
+        launchAgent(agent, tmp_path, {}, command="claude --dangerously-skip-permissions")
+        mock_exec.assert_called_once()
+        args = mock_exec.call_args[0]
+        assert args[0] == "claude"
+        assert args[1] == ["claude", "--dangerously-skip-permissions"]

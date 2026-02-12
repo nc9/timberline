@@ -75,6 +75,10 @@ class SubmodulesConfig(_StrictConfig):
 
 
 class AgentConfig(_StrictConfig):
+    name: str = Field("claude", description="Agent to use (claude, codex, gemini, aider, opencode)")
+    command: str | None = Field(
+        None, description="Custom launch command (e.g. 'claude --dangerously-skip-permissions')"
+    )
     auto_launch: bool = Field(False, description="Launch coding agent after creating worktree")
     inject_context: bool = Field(True, description="Inject worktree context file for the agent")
     context_file: str | None = Field(
@@ -103,9 +107,6 @@ class TimberlineConfig(_StrictConfig):
     base_branch: str = Field("main", description="Base branch to create worktrees from")
     naming_scheme: NamingScheme = Field(
         NamingScheme.COMPOUND, description="Auto-name scheme: minerals, cities, or compound"
-    )
-    default_agent: str = Field(
-        "claude", description="Coding agent to launch (claude, codex, gemini, aider, opencode)"
     )
     pre_land: str | None = Field(
         None, description="Command to run before landing (e.g. 'make check')"
@@ -150,6 +151,12 @@ class WorktreeInfo:
     behind: int = 0
     pr: int = 0  # PR number if checked out from PR, 0 = not from PR
     archived: str = ""  # ISO timestamp when archived, "" = active
+    uncommitted_added: int = 0
+    uncommitted_removed: int = 0
+    committed_added: int = 0
+    committed_removed: int = 0
+    committed_files: int = 0
+    last_commit: str = ""  # ISO timestamp of most recent commit
 
 
 @dataclass(frozen=True)

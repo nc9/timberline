@@ -51,17 +51,16 @@ def test_writeConfig_partial_override(tmp_path: Path):
 
 def test_writeConfig_context_file_roundTrip(tmp_path: Path):
     cfg = TimberlineConfig(
-        default_agent="cc",
-        agent=AgentConfig(context_file="CLAUDE.md"),
+        agent=AgentConfig(name="cc", context_file="CLAUDE.md"),
     )
     writeConfig(tmp_path, cfg)
     loaded = loadConfig(tmp_path)
-    assert loaded.default_agent == "cc"
+    assert loaded.agent.name == "cc"
     assert loaded.agent.context_file == "CLAUDE.md"
 
 
 def test_writeConfig_context_file_none_omitted(tmp_path: Path):
-    cfg = TimberlineConfig(default_agent="z")
+    cfg = TimberlineConfig(agent=AgentConfig(name="z"))
     writeConfig(tmp_path, cfg)
     content = (tmp_path / ".timberline.toml").read_text()
     assert "context_file" not in content
@@ -114,15 +113,35 @@ def test_loadConfig_unknownKey_warns(tmp_path: Path):
         assert any("Unknown config key: 'unknown_field'" in str(warning.message) for warning in w)
 
 
+def test_loadConfig_migrates_legacy_default_agent(tmp_path: Path):
+    """Old top-level default_agent migrates to agent.name."""
+    (tmp_path / ".timberline.toml").write_text(
+        '[timberline]\ndefault_agent = "codex"\nuser = "test"\n'
+    )
+    cfg = loadConfig(tmp_path)
+    assert cfg.agent.name == "codex"
+    assert cfg.user == "test"
+
+
+def test_loadConfig_legacy_default_agent_no_override(tmp_path: Path):
+    """Explicit agent.name takes precedence over legacy default_agent."""
+    (tmp_path / ".timberline.toml").write_text(
+        '[timberline]\ndefault_agent = "codex"\nuser = "test"\n\n'
+        '[timberline.agent]\nname = "gemini"\n'
+    )
+    cfg = loadConfig(tmp_path)
+    assert cfg.agent.name == "gemini"
+
+
 def test_writeInitConfig_commented(tmp_path: Path):
     from timberline.models import InitConfig
 
     cfg = TimberlineConfig(
         user="nc9",
         base_branch="main",
-        default_agent="claude",
         pre_land="make check",
         init=InitConfig(init_command="uv sync"),
+        agent=AgentConfig(name="claude"),
     )
     writeInitConfig(tmp_path, cfg)
     content = (tmp_path / ".timberline.toml").read_text()
@@ -141,3 +160,37 @@ def test_writeInitConfig_commented(tmp_path: Path):
     assert loaded.user == "nc9"
     assert loaded.pre_land == "make check"
     assert loaded.init.init_command == "uv sync"
+
+
+def test_writeInitConfig_agent_name_always_written(tmp_path: Path):
+    """agent.name is always written even when it matches default."""
+    cfg = TimberlineConfig(agent=AgentConfig(name="claude"))
+    writeInitConfig(tmp_path, cfg)
+    content = (tmp_path / ".timberline.toml").read_text()
+    assert 'name = "claude"' in content
+    # should NOT be commented out
+    lines = [ln for ln in content.splitlines() if "name" in ln and "claude" in ln]
+    assert any(not ln.strip().startswith("#") for ln in lines)
+
+
+def test_writeConfig_custom_command_roundTrip(tmp_path: Path):
+    cfg = TimberlineConfig(
+        agent=AgentConfig(name="claude", command="claude --dangerously-skip-permissions"),
+    )
+    writeConfig(tmp_path, cfg)
+    loaded = loadConfig(tmp_path)
+    assert loaded.agent.name == "claude"
+    assert loaded.agent.command == "claude --dangerously-skip-permissions"
+
+
+def test_writeInitConfig_custom_command(tmp_path: Path):
+    cfg = TimberlineConfig(
+        agent=AgentConfig(name="codex", command="codex --full-auto"),
+    )
+    writeInitConfig(tmp_path, cfg)
+    content = (tmp_path / ".timberline.toml").read_text()
+    assert 'name = "codex"' in content
+    assert 'command = "codex --full-auto"' in content
+    loaded = loadConfig(tmp_path)
+    assert loaded.agent.name == "codex"
+    assert loaded.agent.command == "codex --full-auto"

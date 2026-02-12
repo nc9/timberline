@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import shutil
 from collections.abc import Callable
 from pathlib import Path
@@ -117,10 +118,19 @@ def injectAgentContext(
         context_file.write_text(block + "\n")
 
 
-def launchAgent(agent: AgentDef, worktree_path: Path, env_vars: dict[str, str]) -> None:
+def launchAgent(
+    agent: AgentDef,
+    worktree_path: Path,
+    env_vars: dict[str, str],
+    command: str | None = None,
+) -> None:
     env = {**os.environ, **env_vars}
     os.chdir(worktree_path)
-    os.execvpe(agent.binary, [agent.binary], env)
+    if command:
+        parts = shlex.split(command)
+        os.execvpe(parts[0], parts, env)
+    else:
+        os.execvpe(agent.binary, [agent.binary], env)
 
 
 # ─── Session linking ──────────────────────────────────────────────────────────

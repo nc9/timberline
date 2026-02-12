@@ -217,7 +217,6 @@ user = "nc9"
 default_type = "feature"
 base_branch = "main"
 naming_scheme = "minerals"  # minerals | cities | compound
-default_agent = "claude"   # claude | codex | opencode | aider
 pre_land = "make check"    # command to run before pushing
 
 [timberline.init]
@@ -235,6 +234,8 @@ auto_init = true
 recursive = true
 
 [timberline.agent]
+name = "claude"            # claude | codex | gemini | opencode | aider
+# command = ""             # custom launch command (e.g. 'claude --dangerously-skip-permissions')
 auto_launch = false
 inject_context = true
 link_project_session = false  # symlink worktree agent session to main repo

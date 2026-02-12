@@ -267,6 +267,22 @@ def test_config_set_dotNotation(repo_dir: Path):
     assert "env.auto_copy" in result.output
 
 
+def test_config_set_agent_name_known(repo_dir: Path):
+    """Setting agent.name to a known agent succeeds."""
+    runner.invoke(app, ["init", "--defaults"])
+    result = runner.invoke(app, ["config", "set", "agent.name", "codex"])
+    assert result.exit_code == 0
+    assert "agent.name" in result.output
+
+
+def test_config_set_agent_name_unknown_rejects(repo_dir: Path):
+    """Setting agent.name to unknown binary fails."""
+    runner.invoke(app, ["init", "--defaults"])
+    result = runner.invoke(app, ["config", "set", "agent.name", "nonexistent-agent-xyz"])
+    assert result.exit_code == 1
+    assert "Unknown agent" in result.output
+
+
 def test_init_writes_commented_config(repo_dir: Path):
     result = runner.invoke(app, ["init", "--defaults", "--user", "test"])
     assert result.exit_code == 0

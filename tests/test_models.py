@@ -57,7 +57,7 @@ def test_timberlineConfig_defaults():
     assert cfg.env.auto_copy is True
     assert cfg.submodules.recursive is True
     assert cfg.agent.auto_launch is False
-    assert cfg.default_agent == "claude"
+    assert cfg.agent.name == "claude"
 
 
 def test_timberlineConfig_frozen():
@@ -90,6 +90,8 @@ def test_submodulesConfig_frozen():
 
 def test_agentConfig_defaults():
     ac = AgentConfig()
+    assert ac.name == "claude"
+    assert ac.command is None
     assert ac.auto_launch is False
     assert ac.inject_context is True
     assert ac.context_file is None

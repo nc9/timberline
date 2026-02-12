@@ -10,6 +10,7 @@ from typing import Annotated
 import typer
 
 from timberline.agent import (
+    KNOWN_AGENTS,
     buildEnvVars,
     detectInstalledAgents,
     getAgentDef,
@@ -309,11 +310,11 @@ def init(
         user=resolved_user,
         base_branch=base,
         naming_scheme=naming,
-        default_agent=default_agent,
         pre_land=pre_land,
         project_name=project_name,
         init=InitConfig(init_command=init_command) if init_command else InitConfig(),
         agent=AgentConfig(
+            name=default_agent,
             link_project_session=resolved_link_session,
             auto_launch=resolved_auto_launch,
         ),
@@ -367,7 +368,7 @@ def _postCreateSetup(
 
     # inject agent context file
     if config.agent.inject_context:
-        agent_def = getAgentDef(config.default_agent, config.agent.context_file)
+        agent_def = getAgentDef(config.agent.name, config.agent.context_file)
         all_wts = listWorktrees(repo_root, config)
         project_name = resolveProjectName(repo_root, config.project_name)
         injectAgentContext(agent_def, wt_path, info, all_wts, project_name)
@@ -375,7 +376,7 @@ def _postCreateSetup(
 
     # link agent session
     if not no_link and config.agent.link_project_session:
-        linked = linkProjectSession(config.default_agent, wt_path, repo_root)
+        linked = linkProjectSession(config.agent.name, wt_path, repo_root)
         if linked:
             steps.append("Linked agent session")
 
@@ -426,9 +427,9 @@ def new_cmd(
 
     # launch agent
     if agent or config.agent.auto_launch:
-        agent_def = getAgentDef(config.default_agent, config.agent.context_file)
+        agent_def = getAgentDef(config.agent.name, config.agent.context_file)
         env_vars = buildEnvVars(info, repo_root)
-        launchAgent(agent_def, Path(info.path), env_vars)
+        launchAgent(agent_def, Path(info.path), env_vars, config.agent.command)
 
 
 @app.command("create", hidden=True)
@@ -532,9 +533,9 @@ def checkout_cmd(
 
     # launch agent
     if agent or config.agent.auto_launch:
-        agent_def = getAgentDef(config.default_agent, config.agent.context_file)
+        agent_def = getAgentDef(config.agent.name, config.agent.context_file)
         env_vars = buildEnvVars(info, repo_root)
-        launchAgent(agent_def, Path(info.path), env_vars)
+        launchAgent(agent_def, Path(info.path), env_vars, config.agent.command)
 
 
 @app.command("co", hidden=True)
@@ -606,7 +607,7 @@ def rm_cmd(
         for wt in worktrees:
             try:
                 if config.agent.link_project_session:
-                    unlinkProjectSession(config.default_agent, Path(wt.path))
+                    unlinkProjectSession(config.agent.name, Path(wt.path))
                 removeWorktree(repo_root, config, wt.name, force=force, keep_branch=keep_branch)
                 printSuccess(f"Removed {wt.name}")
             except TimberlineError as e:
@@ -620,7 +621,7 @@ def rm_cmd(
     # resolve path before removal for unlinking
     wt = getWorktree(repo_root, config, name)
     if wt and config.agent.link_project_session:
-        unlinkProjectSession(config.default_agent, Path(wt.path))
+        unlinkProjectSession(config.agent.name, Path(wt.path))
 
     try:
         removeWorktree(repo_root, config, name, force=force, keep_branch=keep_branch)
@@ -710,7 +711,7 @@ def done(
 
     # unlink agent session
     if config.agent.link_project_session:
-        unlinkProjectSession(config.default_agent, wt_path)
+        unlinkProjectSession(config.agent.name, wt_path)
 
     try:
         archiveWorktreeDomain(repo_root, config, wt.name)
@@ -741,7 +742,7 @@ def unarchive(
 
     # re-link agent session
     if config.agent.link_project_session:
-        linkProjectSession(config.default_agent, Path(wt.path), repo_root)
+        linkProjectSession(config.agent.name, Path(wt.path), repo_root)
 
     printSuccess(f"Unarchived {wt.name}")
     print(wt.path)
@@ -820,9 +821,9 @@ def agent_cmd(
         return
 
     wt = _resolveWorktree(repo_root, config, name)
-    agent_def = getAgentDef(config.default_agent, config.agent.context_file)
+    agent_def = getAgentDef(config.agent.name, config.agent.context_file)
     env_vars = buildEnvVars(wt, repo_root)
-    launchAgent(agent_def, Path(wt.path), env_vars)
+    launchAgent(agent_def, Path(wt.path), env_vars, config.agent.command)
 
 
 # ─── run-init ──────────────────────────────────────────────────────────────────
@@ -1085,6 +1086,12 @@ def config_set_cmd(
 ) -> None:
     """Set a config value."""
     repo_root = _resolveRoot()
+
+    # validate agent.name: must be known agent or binary on PATH
+    if key == "agent.name" and value not in KNOWN_AGENTS and not validateAgentBinary(value):
+        printError(f"Unknown agent '{value}' (known: {', '.join(sorted(KNOWN_AGENTS))})")
+        raise typer.Exit(1)
+
     try:
         updateConfigField(repo_root, key, value)
         printSuccess(f"Set {key} = {value}")

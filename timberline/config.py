@@ -52,6 +52,14 @@ def loadConfig(repo_root: Path) -> TimberlineConfig:
             else:
                 data[key] = val
 
+    # migrate legacy top-level default_agent → agent.name
+    if "default_agent" in data:
+        agent = data.setdefault("agent", {})
+        if isinstance(agent, dict):
+            agent.setdefault("name", data.pop("default_agent"))
+        else:
+            data.pop("default_agent")
+
     return TimberlineConfig.model_validate(data)
 
 
@@ -144,7 +152,10 @@ def writeInitConfig(repo_root: Path, config: TimberlineConfig) -> Path:
             default_val = getattr(sub_defaults, name)
             desc = field_info.description or ""
 
-            if val != default_val and val is not None:
+            # always write agent.name so the active agent is visible
+            always_write = section_name == "agent" and name == "name"
+
+            if always_write or (val != default_val and val is not None):
                 sub_table.add(name, _tomlValue(val))
                 has_non_default = True
             elif val is None:

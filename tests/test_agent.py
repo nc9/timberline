@@ -66,33 +66,45 @@ def test_injectAgentContext_new_file(tmp_path: Path):
     info = _makeInfo()
     agent = KNOWN_AGENTS["claude"]
     injectAgentContext(agent, tmp_path, info, [info], "myproject")
-    content = (tmp_path / "CLAUDE.md").read_text()
+    content = (tmp_path / ".claude" / "rules" / "worktrees.md").read_text()
     assert "<!-- timberline:start -->" in content
     assert "obsidian" in content
 
 
 def test_injectAgentContext_existing_without_markers(tmp_path: Path):
-    (tmp_path / "CLAUDE.md").write_text("# Existing content\n")
+    rules_dir = tmp_path / ".claude" / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "worktrees.md").write_text("# Existing content\n")
     info = _makeInfo()
     agent = KNOWN_AGENTS["claude"]
     injectAgentContext(agent, tmp_path, info, [info], "myproject")
-    content = (tmp_path / "CLAUDE.md").read_text()
+    content = (rules_dir / "worktrees.md").read_text()
     assert "# Existing content" in content
     assert "<!-- timberline:start -->" in content
 
 
 def test_injectAgentContext_replaces_existing_markers(tmp_path: Path):
-    (tmp_path / "CLAUDE.md").write_text(
+    rules_dir = tmp_path / ".claude" / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "worktrees.md").write_text(
         "# Header\n<!-- timberline:start -->\nold content\n<!-- timberline:end -->\n# Footer\n"
     )
     info = _makeInfo()
     agent = KNOWN_AGENTS["claude"]
     injectAgentContext(agent, tmp_path, info, [info], "myproject")
-    content = (tmp_path / "CLAUDE.md").read_text()
+    content = (rules_dir / "worktrees.md").read_text()
     assert "old content" not in content
     assert "obsidian" in content
     assert "# Header" in content
     assert "# Footer" in content
+
+
+def test_injectAgentContext_creates_parent_dirs(tmp_path: Path):
+    info = _makeInfo()
+    agent = KNOWN_AGENTS["claude"]
+    assert not (tmp_path / ".claude").exists()
+    injectAgentContext(agent, tmp_path, info, [info], "myproject")
+    assert (tmp_path / ".claude" / "rules" / "worktrees.md").exists()
 
 
 def test_injectAgentContext_codex_uses_agents_md(tmp_path: Path):
@@ -100,7 +112,7 @@ def test_injectAgentContext_codex_uses_agents_md(tmp_path: Path):
     agent = KNOWN_AGENTS["codex"]
     injectAgentContext(agent, tmp_path, info, [info], "myproject")
     assert (tmp_path / "AGENTS.md").exists()
-    assert not (tmp_path / "CLAUDE.md").exists()
+    assert not (tmp_path / ".claude").exists()
     content = (tmp_path / "AGENTS.md").read_text()
     assert "obsidian" in content
 
@@ -108,7 +120,13 @@ def test_injectAgentContext_codex_uses_agents_md(tmp_path: Path):
 def test_getAgentDef_known():
     agent = getAgentDef("claude")
     assert agent.binary == "claude"
-    assert agent.context_file == "CLAUDE.md"
+    assert agent.context_file == ".claude/rules/worktrees.md"
+
+
+def test_getAgentDef_gemini():
+    agent = getAgentDef("gemini")
+    assert agent.binary == "gemini"
+    assert agent.context_file == "GEMINI.md"
 
 
 def test_getAgentDef_unknown_returns_default():
@@ -131,7 +149,7 @@ def test_getAgentDef_known_with_override():
 
 def test_getAgentDef_known_no_override():
     agent = getAgentDef("claude")
-    assert agent.context_file == "CLAUDE.md"
+    assert agent.context_file == ".claude/rules/worktrees.md"
 
 
 def test_validateAgentBinary_known_found():

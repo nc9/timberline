@@ -105,7 +105,7 @@ class TimberlineConfig(_StrictConfig):
         NamingScheme.COMPOUND, description="Auto-name scheme: minerals, cities, or compound"
     )
     default_agent: str = Field(
-        "claude", description="Coding agent to launch (claude, codex, aider, opencode)"
+        "claude", description="Coding agent to launch (claude, codex, gemini, aider, opencode)"
     )
     pre_land: str | None = Field(
         None, description="Command to run before landing (e.g. 'make check')"

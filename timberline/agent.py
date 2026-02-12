@@ -14,8 +14,9 @@ _MARKER_END = "<!-- timberline:end -->"
 DEFAULT_CONTEXT_FILE = "AGENTS.md"
 
 KNOWN_AGENTS: dict[str, AgentDef] = {
-    "claude": AgentDef(binary="claude", context_file="CLAUDE.md"),
+    "claude": AgentDef(binary="claude", context_file=".claude/rules/worktrees.md"),
     "codex": AgentDef(binary="codex", context_file="AGENTS.md"),
+    "gemini": AgentDef(binary="gemini", context_file="GEMINI.md"),
     "opencode": AgentDef(binary="opencode", context_file="AGENTS.md"),
     "aider": AgentDef(binary="aider", context_file="CONVENTIONS.md"),
 }
@@ -102,6 +103,7 @@ def injectAgentContext(
     context_file = worktree_path / agent.context_file
     block = buildContextBlock(info, all_worktrees, project_name)
 
+    context_file.parent.mkdir(parents=True, exist_ok=True)
     if context_file.exists():
         content = context_file.read_text()
         if _MARKER_START in content and _MARKER_END in content:

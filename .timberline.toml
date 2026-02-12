@@ -5,8 +5,7 @@ project_name = "lumberjack"
 user = "nc9"
 # default_type = "feature"  # Default branch type (feature, fix, hotfix, chore, refactor)
 # base_branch = "main"  # Base branch to create worktrees from
-# naming_scheme = "minerals"
-# default_agent = "claude"  # Coding agent to launch (claude, codex, aider, opencode)
+naming_scheme = "minerals"
 pre_land = "make check"
 
 [timberline.init]
@@ -15,6 +14,7 @@ init_command = "uv sync"
 # post_init = []  # Additional commands to run after init_command
 
 [timberline.agent]
-auto_launch = true
+name = "claude"
+# auto_launch = false  # Launch coding agent after creating worktree
 # inject_context = true  # Inject worktree context file for the agent
-link_project_session = false
+# link_project_session = false  # Symlink worktree agent session to main repo session

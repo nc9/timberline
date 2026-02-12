@@ -99,14 +99,14 @@ Each worktree gets its own branch (from `branch_template`), dependencies install
 ## Checkout Existing Branches & PRs
 
 ```bash
-tl checkout nc9/feature/auth        # from remote branch (name: "auth")
+tl checkout nc9/feature/auth        # from remote branch
 tl checkout #42                     # from PR number
 tl checkout --pr 42                 # explicit --pr flag
-tl checkout #42 --name myname       # override derived name
+tl checkout #42 --name myname       # override generated name
 tl co #42                           # alias
 ```
 
-The worktree name is derived from the last `/`-segment of the branch (e.g. `nc9/feature/auth` → `auth`). Override with `--name`.
+The worktree name is auto-generated from the configured naming scheme (minerals/cities/compound), matching `tl new` behavior. Override with `--name`.
 
 When checking out a PR, `tl pr` and `tl land` will push to the existing PR instead of creating a new one.
 

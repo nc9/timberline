@@ -108,6 +108,50 @@ def getStatusShort(cwd: Path) -> str:
     return runGit("status", "--short", cwd=cwd)
 
 
+def _parseNumstat(output: str) -> tuple[int, int]:
+    """Parse git diff --numstat output into (added, removed). Binary lines treated as 0."""
+    added = 0
+    removed = 0
+    for line in output.splitlines():
+        parts = line.split("\t")
+        if len(parts) < 3:
+            continue
+        a, r = parts[0], parts[1]
+        if a != "-":
+            added += int(a)
+        if r != "-":
+            removed += int(r)
+    return added, removed
+
+
+def getDiffNumstat(cwd: Path) -> tuple[int, int]:
+    """Uncommitted changes: (added, removed) line counts (staged + unstaged)."""
+    unstaged = runGit("diff", "--numstat", cwd=cwd)
+    staged = runGit("diff", "--numstat", "--cached", cwd=cwd)
+    ua, ur = _parseNumstat(unstaged)
+    sa, sr = _parseNumstat(staged)
+    return ua + sa, ur + sr
+
+
+def getCommittedDiffStats(branch: str, base: str, cwd: Path) -> tuple[int, int, int]:
+    """Committed changes vs base: (added, removed, files)."""
+    try:
+        output = runGit("diff", "--numstat", f"{base}...{branch}", cwd=cwd)
+    except TimberlineError:
+        return 0, 0, 0
+    added, removed = _parseNumstat(output)
+    files = sum(1 for line in output.splitlines() if line.strip())
+    return added, removed, files
+
+
+def getLastCommitTime(cwd: Path) -> str:
+    """ISO timestamp of most recent commit. Empty string if no commits."""
+    try:
+        return runGit("log", "-1", "--format=%aI", cwd=cwd)
+    except TimberlineError:
+        return ""
+
+
 def hasTrackedChanges(cwd: Path) -> bool:
     """Check for modified/staged tracked files only (ignores untracked)."""
     output = runGit("status", "--short", "--untracked-files=no", cwd=cwd)

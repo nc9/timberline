@@ -183,6 +183,21 @@ def test_checkoutWorktree_with_pr(repo_with_config: tuple[Path, TimberlineConfig
     assert wt.pr == 42
 
 
+def test_listWorktrees_populates_diff_stats(repo_with_config: tuple[Path, TimberlineConfig]):
+    """listWorktrees should populate uncommitted/committed/last_commit fields."""
+    repo, cfg = repo_with_config
+    info = createWorktree(repo, cfg, name="stats")
+    wt_path = Path(info.path)
+
+    # add uncommitted change
+    (wt_path / "README.md").write_text("modified content\n")
+
+    wts = listWorktrees(repo, cfg)
+    wt = next(w for w in wts if w.name == "stats")
+    assert wt.uncommitted_added > 0 or wt.uncommitted_removed > 0
+    assert wt.last_commit  # should have timestamp from base branch
+
+
 def test_checkoutWorktree_shows_in_list(repo_with_config: tuple[Path, TimberlineConfig]):
     """Checked out worktree appears in listWorktrees."""
     repo, cfg = repo_with_config

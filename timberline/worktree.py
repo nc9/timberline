@@ -7,6 +7,9 @@ from pathlib import Path
 from timberline.git import (
     branchExists,
     fetchBranch,
+    getCommittedDiffStats,
+    getDiffNumstat,
+    getLastCommitTime,
     getStatusShort,
     hasTrackedChanges,
     listWorktreesRaw,
@@ -224,6 +227,17 @@ def listWorktrees(
             else:
                 status = "clean"
 
+        # gather diff stats for active worktrees with existing paths
+        uc_added = uc_removed = cm_added = cm_removed = cm_files = 0
+        last_commit = ""
+        if not archived and wt_path.exists():
+            uc_added, uc_removed = getDiffNumstat(wt_path)
+            branch = data.get("branch", "")
+            base = data.get("base_branch", config.base_branch)
+            if branch:
+                cm_added, cm_removed, cm_files = getCommittedDiffStats(branch, base, repo_root)
+            last_commit = getLastCommitTime(wt_path)
+
         worktrees.append(
             WorktreeInfo(
                 name=name,
@@ -235,6 +249,12 @@ def listWorktrees(
                 status=status,
                 pr=int(data.get("pr", 0)),
                 archived=archived,
+                uncommitted_added=uc_added,
+                uncommitted_removed=uc_removed,
+                committed_added=cm_added,
+                committed_removed=cm_removed,
+                committed_files=cm_files,
+                last_commit=last_commit,
             )
         )
 

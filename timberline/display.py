@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime
 from enum import StrEnum
 
+import humanize
 from rich.console import Console
 from rich.table import Table
 from rich.tree import Tree
@@ -23,21 +24,33 @@ def printWorktreeTable(worktrees: list[WorktreeInfo]) -> None:
     table = Table(show_header=True, header_style="bold")
     table.add_column("Name")
     table.add_column("Branch")
-    table.add_column("Status")
-    table.add_column("Age")
+    table.add_column("Uncommitted")
+    table.add_column("Committed")
+    table.add_column("Last Active")
 
     for wt in worktrees:
-        status = wt.status or "clean"
+        # uncommitted column
         if wt.archived:
-            style = "dim"
-        elif status == "clean":
-            style = "green"
+            uc_str = "[dim]archived[/dim]"
+        elif wt.uncommitted_added or wt.uncommitted_removed:
+            uc_str = f"[yellow]+{wt.uncommitted_added} -{wt.uncommitted_removed}[/yellow]"
+        elif wt.status and wt.status != "clean":
+            uc_str = f"[yellow]{wt.status}[/yellow]"
         else:
-            style = "yellow"
-        age = formatAge(wt.created_at) if wt.created_at else ""
+            uc_str = "[green]clean[/green]"
+
+        # committed column
+        if wt.archived:
+            cm_str = ""
+        elif wt.committed_added or wt.committed_removed:
+            cm_str = f"+{wt.committed_added} -{wt.committed_removed} · {wt.committed_files}f"
+        else:
+            cm_str = ""
+
+        last_active = formatLastActive(wt.last_commit)
         name_str = f"[dim]{wt.name}[/dim]" if wt.archived else wt.name
         branch_str = f"[dim]{wt.branch}[/dim]" if wt.archived else wt.branch
-        table.add_row(name_str, branch_str, f"[{style}]{status}[/{style}]", age)
+        table.add_row(name_str, branch_str, uc_str, cm_str, last_active)
 
     _console.print(table)
 
@@ -52,6 +65,12 @@ def printWorktreeJson(worktrees: list[WorktreeInfo]) -> None:
             "path": wt.path,
             "created_at": wt.created_at,
             "status": wt.status,
+            "uncommitted_added": wt.uncommitted_added,
+            "uncommitted_removed": wt.uncommitted_removed,
+            "committed_added": wt.committed_added,
+            "committed_removed": wt.committed_removed,
+            "committed_files": wt.committed_files,
+            "last_commit": wt.last_commit,
         }
         for wt in worktrees
     ]
@@ -144,6 +163,22 @@ def printSuccess(msg: str) -> None:
 
 def printWarning(msg: str) -> None:
     _console.print(f"[bold yellow]![/bold yellow] {msg}")
+
+
+def formatLastActive(iso_timestamp: str) -> str:
+    """Format timestamp: 'N hours ago' for today, 'Nth Mon YY' for older."""
+    if not iso_timestamp:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso_timestamp)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        now = datetime.now(UTC)
+        if dt.date() == now.date():
+            return humanize.naturaltime(now - dt)
+        return f"{humanize.ordinal(dt.day)} {dt.strftime('%b %y')}"
+    except (ValueError, TypeError):
+        return ""
 
 
 def formatAge(iso_timestamp: str) -> str:

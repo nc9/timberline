@@ -7,12 +7,16 @@ from unittest.mock import patch
 import pytest
 
 from timberline.git import (
+    _parseNumstat,
     branchExists,
     fetchBranch,
     findRepoRoot,
     getAheadBehind,
+    getCommittedDiffStats,
     getCurrentBranch,
     getDefaultBranch,
+    getDiffNumstat,
+    getLastCommitTime,
     getStatusShort,
     isBranchMerged,
     listWorktreesRaw,
@@ -239,3 +243,68 @@ def test_resolvePrBranch_gh_not_found():
         pytest.raises(TimberlineError, match="PR #99"),
     ):
         resolvePrBranch(99)
+
+
+# ─── _parseNumstat tests ────────────────────────────────────────────────────
+
+
+def test_parseNumstat_normal():
+    output = "10\t5\tsrc/main.py\n3\t0\tREADME.md"
+    assert _parseNumstat(output) == (13, 5)
+
+
+def test_parseNumstat_binary():
+    output = "-\t-\timage.png\n4\t2\tcode.py"
+    assert _parseNumstat(output) == (4, 2)
+
+
+def test_parseNumstat_empty():
+    assert _parseNumstat("") == (0, 0)
+
+
+def test_parseNumstat_mixed():
+    output = "100\t50\tbig.py\n-\t-\tbin.wasm\n1\t1\tsmall.py"
+    assert _parseNumstat(output) == (101, 51)
+
+
+# ─── getDiffNumstat tests ───────────────────────────────────────────────────
+
+
+def test_getDiffNumstat_clean(tmp_git_repo: Path):
+    added, removed = getDiffNumstat(tmp_git_repo)
+    assert added == 0
+    assert removed == 0
+
+
+def test_getDiffNumstat_with_changes(tmp_git_repo: Path):
+    (tmp_git_repo / "README.md").write_text("line1\nline2\nline3\n")
+    added, removed = getDiffNumstat(tmp_git_repo)
+    assert added > 0
+
+
+# ─── getCommittedDiffStats tests ────────────────────────────────────────────
+
+
+def test_getCommittedDiffStats_no_diff(tmp_git_repo: Path):
+    added, removed, files = getCommittedDiffStats("main", "main", tmp_git_repo)
+    assert added == 0 and removed == 0 and files == 0
+
+
+def test_getCommittedDiffStats_with_commits(tmp_git_repo: Path):
+    _run("git checkout -b feat/stats", tmp_git_repo)
+    (tmp_git_repo / "new.txt").write_text("hello\nworld\n")
+    _run("git add .", tmp_git_repo)
+    _run("git commit -m add-file", tmp_git_repo)
+    added, removed, files = getCommittedDiffStats("feat/stats", "main", tmp_git_repo)
+    assert added == 2
+    assert removed == 0
+    assert files == 1
+
+
+# ─── getLastCommitTime tests ────────────────────────────────────────────────
+
+
+def test_getLastCommitTime(tmp_git_repo: Path):
+    ts = getLastCommitTime(tmp_git_repo)
+    assert ts  # should have ISO timestamp from initial commit
+    assert "T" in ts  # ISO format

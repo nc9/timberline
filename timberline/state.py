@@ -47,6 +47,8 @@ def addWorktreeToState(state: StateFile, info: WorktreeInfo) -> StateFile:
     }
     if info.pr:
         entry["pr"] = str(info.pr)
+    if info.mode != "worktree":
+        entry["mode"] = info.mode
     new_worktrees[info.name] = entry
     return StateFile(
         version=state.version,
@@ -107,15 +109,22 @@ def reconcileState(
     """Remove orphaned entries, add untracked worktrees."""
     git_paths = {wt["worktree"] for wt in git_worktrees}
 
-    # remove orphaned (keep archived entries whose directory still exists)
+    # remove orphaned — split by mode
     new_worktrees: dict[str, dict[str, str]] = {}
     for name, info in state.worktrees.items():
-        in_git = info.get("path") in git_paths
+        mode = info.get("mode", "worktree")
         archived_on_disk = info.get("archived") and Path(info.get("path", "")).exists()
-        if in_git or archived_on_disk:
-            new_worktrees[name] = info
+        if mode == "checkout":
+            # checkout entries: validate by directory existence
+            if Path(info.get("path", "")).exists() or archived_on_disk:
+                new_worktrees[name] = info
+        else:
+            # worktree entries: validate against git worktree list
+            in_git = info.get("path") in git_paths
+            if in_git or archived_on_disk:
+                new_worktrees[name] = info
 
-    # add untracked (worktrees in global dir not in state)
+    # add untracked (worktree-mode only — clones can't be auto-discovered from git)
     known_paths = {info.get("path") for info in new_worktrees.values()}
     tl_prefix = str(getWorktreeBasePath(project_name)) + "/"
 

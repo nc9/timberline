@@ -208,16 +208,16 @@ def test_isBranchMerged_diverged_after_merge(tmp_path: Path):
 
 def test_isBranchMerged_no_remote_ref(tmp_git_repo: Path):
     """Missing remote ref returns False (safe default)."""
-    assert not isBranchMerged("main", "origin/main", tmp_git_repo)
+    assert not isBranchMerged("main", "origin/nonexistent", tmp_git_repo)
 
 
 # ─── fetchBranch tests ────────────────────────────────────────────────────────
 
 
-def test_fetchBranch_no_remote(tmp_git_repo: Path):
-    """fetchBranch raises TimberlineError when no remote exists."""
+def test_fetchBranch_nonexistent(tmp_git_repo: Path):
+    """fetchBranch raises TimberlineError for nonexistent branch."""
     with pytest.raises(TimberlineError):
-        fetchBranch("main", cwd=tmp_git_repo)
+        fetchBranch("nonexistent-branch", cwd=tmp_git_repo)
 
 
 # ─── resolvePrBranch tests ───────────────────────────────────────────────────

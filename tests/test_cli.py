@@ -580,6 +580,7 @@ def test_home_prints_repo_root(repo_dir: Path):
 def test_checkout_local_branch(repo_dir: Path):
     runner.invoke(app, ["init", "--defaults", "--user", "test"])
     runGit("branch", "feature/login", cwd=repo_dir)
+    runGit("push", "origin", "feature/login", cwd=repo_dir)
 
     result = runner.invoke(app, ["checkout", "feature/login", "--no-init"])
     assert result.exit_code == 0
@@ -589,6 +590,7 @@ def test_checkout_local_branch(repo_dir: Path):
 def test_checkout_with_name_override(repo_dir: Path):
     runner.invoke(app, ["init", "--defaults", "--user", "test"])
     runGit("branch", "feature/login", cwd=repo_dir)
+    runGit("push", "origin", "feature/login", cwd=repo_dir)
 
     result = runner.invoke(app, ["checkout", "feature/login", "--name", "myname", "--no-init"])
     assert result.exit_code == 0
@@ -601,6 +603,7 @@ def test_checkout_pr_hash_syntax(repo_dir: Path):
 
     with patch("timberline.cli.resolvePrBranch", return_value=("feat/pr-branch", "main")):
         runGit("branch", "feat/pr-branch", cwd=repo_dir)
+        runGit("push", "origin", "feat/pr-branch", cwd=repo_dir)
         result = runner.invoke(app, ["checkout", "#42", "--no-init"])
         assert result.exit_code == 0
         assert "Checked out" in result.output
@@ -612,6 +615,7 @@ def test_checkout_pr_flag(repo_dir: Path):
 
     with patch("timberline.cli.resolvePrBranch", return_value=("feat/pr-flag", "main")):
         runGit("branch", "feat/pr-flag", cwd=repo_dir)
+        runGit("push", "origin", "feat/pr-flag", cwd=repo_dir)
         result = runner.invoke(app, ["checkout", "--pr", "99", "--no-init"])
         assert result.exit_code == 0
         assert "Checked out" in result.output
@@ -637,6 +641,7 @@ def test_co_alias(repo_dir: Path):
     """co alias works same as checkout."""
     runner.invoke(app, ["init", "--defaults", "--user", "test"])
     runGit("branch", "feature/alias-test", cwd=repo_dir)
+    runGit("push", "origin", "feature/alias-test", cwd=repo_dir)
 
     result = runner.invoke(app, ["co", "feature/alias-test", "--no-init"])
     assert result.exit_code == 0
@@ -647,6 +652,7 @@ def test_checkout_shows_in_ls(repo_dir: Path):
     """Checked out worktree appears in ls."""
     runner.invoke(app, ["init", "--defaults", "--user", "test"])
     runGit("branch", "feature/visible", cwd=repo_dir)
+    runGit("push", "origin", "feature/visible", cwd=repo_dir)
 
     runner.invoke(app, ["checkout", "feature/visible", "--no-init"])
     result = runner.invoke(app, ["ls", "--json"])
@@ -663,6 +669,7 @@ def test_checkout_pr_aware_push(repo_dir: Path):
 
     with patch("timberline.cli.resolvePrBranch", return_value=("feat/pr-push", "main")):
         runGit("branch", "feat/pr-push", cwd=repo_dir)
+        runGit("push", "origin", "feat/pr-push", cwd=repo_dir)
         runner.invoke(app, ["checkout", "#42", "--no-init"])
 
     # get generated worktree name from state

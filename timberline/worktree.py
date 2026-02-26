@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import contextlib
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
 from timberline.git import (
     branchExists,
+    cloneCheckoutExistingBranch,
+    cloneCheckoutNewBranch,
+    cloneLocal,
     fetchBranch,
     getCommittedDiffStats,
     getDiffNumstat,
     getLastCommitTime,
+    getRemoteUrl,
     getStatusShort,
     hasTrackedChanges,
     listWorktreesRaw,
@@ -160,6 +165,105 @@ def checkoutWorktree(
     return info
 
 
+def createCheckoutClone(
+    repo_root: Path,
+    config: TimberlineConfig,
+    name: str | None = None,
+    branch: str | None = None,
+    base: str | None = None,
+    type_: str | None = None,
+) -> WorktreeInfo:
+    """Create a local clone (checkout mode). Returns WorktreeInfo."""
+    project_name = _projectName(config, repo_root)
+
+    if not name:
+        state = loadState(project_name, repo_root)
+        existing = set(state.worktrees.keys())
+        name = generateName(config.naming_scheme, existing)
+
+    wt_path = getWorktreeBasePath(project_name) / name
+    if wt_path.exists():
+        raise TimberlineError(f"Worktree '{name}' already exists at {wt_path}")
+
+    branch_type = type_ or config.default_type
+    if not branch:
+        branch = resolveBranchName(config, name, branch_type)
+
+    base_branch = base or config.base_branch
+
+    # ensure project dir + repo_root marker
+    writeRepoRootMarker(project_name, repo_root)
+
+    # clone locally with hardlinks
+    remote_url = getRemoteUrl(cwd=repo_root)
+    cloneLocal(repo_root, wt_path, remote_url)
+    cloneCheckoutNewBranch(branch, base_branch, wt_path)
+
+    now = datetime.now(UTC).isoformat()
+    info = WorktreeInfo(
+        name=name,
+        branch=branch,
+        base_branch=base_branch,
+        type=branch_type,
+        path=str(wt_path),
+        created_at=now,
+        mode="checkout",
+    )
+
+    state = loadState(project_name, repo_root)
+    state = addWorktreeToState(state, info)
+    saveState(project_name, state)
+
+    return info
+
+
+def checkoutClone(
+    repo_root: Path,
+    config: TimberlineConfig,
+    branch: str,
+    name: str | None = None,
+    base_branch: str | None = None,
+    pr: int = 0,
+) -> WorktreeInfo:
+    """Create a local clone from an existing remote branch. Returns WorktreeInfo."""
+    project_name = _projectName(config, repo_root)
+
+    if not name:
+        state = loadState(project_name, repo_root)
+        existing = set(state.worktrees.keys())
+        name = generateName(config.naming_scheme, existing)
+
+    wt_path = getWorktreeBasePath(project_name) / name
+    if wt_path.exists():
+        raise TimberlineError(f"Worktree '{name}' already exists at {wt_path}")
+
+    # ensure project dir + repo_root marker
+    writeRepoRootMarker(project_name, repo_root)
+
+    # clone locally with hardlinks
+    remote_url = getRemoteUrl(cwd=repo_root)
+    cloneLocal(repo_root, wt_path, remote_url)
+    cloneCheckoutExistingBranch(branch, wt_path)
+
+    now = datetime.now(UTC).isoformat()
+    info = WorktreeInfo(
+        name=name,
+        branch=branch,
+        base_branch=base_branch or config.base_branch,
+        type="",
+        path=str(wt_path),
+        created_at=now,
+        pr=pr,
+        mode="checkout",
+    )
+
+    state = loadState(project_name, repo_root)
+    state = addWorktreeToState(state, info)
+    saveState(project_name, state)
+
+    return info
+
+
 def removeWorktree(
     repo_root: Path,
     config: TimberlineConfig,
@@ -172,26 +276,27 @@ def removeWorktree(
     if not wt_path.exists():
         raise TimberlineError(f"Worktree '{name}' not found at {wt_path}")
 
+    state = loadState(project_name, repo_root)
+    mode = state.worktrees.get(name, {}).get("mode", "worktree")
+
     # check dirty (tracked files only — untracked like CLAUDE.md are expected)
     if not force and hasTrackedChanges(wt_path):
         raise TimberlineError(
             f"Worktree '{name}' has uncommitted changes. Use --force to override."
         )
 
-    # get branch before removing
-    state = loadState(project_name, repo_root)
     branch = state.worktrees.get(name, {}).get("branch", "")
 
-    # remove worktree (always --force: git rejects even untracked files without it)
-    runGit("worktree", "remove", "--force", str(wt_path), cwd=repo_root)
-
-    # prune
-    runGit("worktree", "prune", cwd=repo_root)
-
-    # delete branch
-    if branch and not keep_branch:
-        with contextlib.suppress(TimberlineError):
-            runGit("branch", "-D", branch, cwd=repo_root)
+    if mode == "checkout":
+        # checkout mode: rmtree, skip branch -D (branch only lived in clone)
+        shutil.rmtree(wt_path)
+    else:
+        # worktree mode: git worktree remove + prune + branch -D
+        runGit("worktree", "remove", "--force", str(wt_path), cwd=repo_root)
+        runGit("worktree", "prune", cwd=repo_root)
+        if branch and not keep_branch:
+            with contextlib.suppress(TimberlineError):
+                runGit("branch", "-D", branch, cwd=repo_root)
 
     # update state
     state = removeWorktreeFromState(state, name)
@@ -230,12 +335,15 @@ def listWorktrees(
         # gather diff stats for active worktrees with existing paths
         uc_added = uc_removed = cm_added = cm_removed = cm_files = 0
         last_commit = ""
+        mode = data.get("mode", "worktree")
         if not archived and wt_path.exists():
             uc_added, uc_removed = getDiffNumstat(wt_path)
             branch = data.get("branch", "")
             base = data.get("base_branch", config.base_branch)
             if branch:
-                cm_added, cm_removed, cm_files = getCommittedDiffStats(branch, base, repo_root)
+                # checkout clones are their own repo — diff stats need cwd=wt_path
+                diff_cwd = wt_path if mode == "checkout" else repo_root
+                cm_added, cm_removed, cm_files = getCommittedDiffStats(branch, base, diff_cwd)
             last_commit = getLastCommitTime(wt_path)
 
         worktrees.append(
@@ -255,6 +363,7 @@ def listWorktrees(
                 committed_removed=cm_removed,
                 committed_files=cm_files,
                 last_commit=last_commit,
+                mode=mode,
             )
         )
 

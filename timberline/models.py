@@ -16,6 +16,11 @@ class NamingScheme(StrEnum):
     COMPOUND = "compound"
 
 
+class WorktreeMode(StrEnum):
+    WORKTREE = "worktree"
+    CHECKOUT = "checkout"
+
+
 class BranchType(StrEnum):
     FEATURE = "feature"
     FIX = "fix"
@@ -123,6 +128,9 @@ class TimberlineConfig(_StrictConfig):
     agent: AgentConfig = Field(
         default_factory=lambda: AgentConfig(), description="Coding agent settings"
     )
+    mode: WorktreeMode = Field(
+        WorktreeMode.CHECKOUT, description="Working copy mode (worktree or checkout)"
+    )
 
     @field_validator("branch_template")
     @classmethod
@@ -157,6 +165,7 @@ class WorktreeInfo:
     committed_removed: int = 0
     committed_files: int = 0
     last_commit: str = ""  # ISO timestamp of most recent commit
+    mode: str = "worktree"
 
 
 @dataclass(frozen=True)

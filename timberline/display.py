@@ -21,9 +21,15 @@ def printWorktreeTable(worktrees: list[WorktreeInfo]) -> None:
         _console.print("[dim]No worktrees found[/dim]")
         return
 
+    # show mode column only when mixed modes exist
+    modes = {wt.mode for wt in worktrees}
+    show_mode = len(modes) > 1
+
     table = Table(show_header=True, header_style="bold")
     table.add_column("Name")
     table.add_column("Branch")
+    if show_mode:
+        table.add_column("Mode")
     table.add_column("Uncommitted")
     table.add_column("Committed")
     table.add_column("Last Active")
@@ -50,7 +56,11 @@ def printWorktreeTable(worktrees: list[WorktreeInfo]) -> None:
         last_active = formatLastActive(wt.last_commit)
         name_str = f"[dim]{wt.name}[/dim]" if wt.archived else wt.name
         branch_str = f"[dim]{wt.branch}[/dim]" if wt.archived else wt.branch
-        table.add_row(name_str, branch_str, uc_str, cm_str, last_active)
+        row = [name_str, branch_str]
+        if show_mode:
+            row.append(wt.mode)
+        row.extend([uc_str, cm_str, last_active])
+        table.add_row(*row)
 
     _console.print(table)
 
@@ -65,6 +75,7 @@ def printWorktreeJson(worktrees: list[WorktreeInfo]) -> None:
             "path": wt.path,
             "created_at": wt.created_at,
             "status": wt.status,
+            "mode": wt.mode,
             "uncommitted_added": wt.uncommitted_added,
             "uncommitted_removed": wt.uncommitted_removed,
             "committed_added": wt.committed_added,

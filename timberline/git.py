@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from timberline.models import TimberlineError
+from timberline.models import TimberlineError, getProjectDir, getTimberlineHome
 
 
 def runGit(*args: str, cwd: Path | None = None) -> str:
@@ -23,7 +23,7 @@ def runGit(*args: str, cwd: Path | None = None) -> str:
 
 
 def findRepoRoot(cwd: Path | None = None) -> Path:
-    """Find main repo root, resolving through worktrees if needed."""
+    """Find main repo root, resolving through worktrees and clones."""
     start = cwd or Path.cwd()
     toplevel = Path(runGit("rev-parse", "--show-toplevel", cwd=start))
 
@@ -34,6 +34,17 @@ def findRepoRoot(cwd: Path | None = None) -> Path:
         main_git_dir = Path(gitdir).resolve()
         # walk up: /repo/.git/worktrees/<n> -> /repo
         return main_git_dir.parent.parent.parent
+
+    # clone detection: .git is a dir and toplevel is under ~/.timberline/projects/
+    tl_home = getTimberlineHome()
+    projects_prefix = str(tl_home / "projects") + "/"
+    if git_path.is_dir() and str(toplevel).startswith(projects_prefix):
+        # path: ~/.timberline/projects/<project>/worktrees/<name>
+        rel = str(toplevel).removeprefix(projects_prefix)
+        project_name = rel.split("/")[0]
+        marker = getProjectDir(project_name) / "repo_root"
+        if marker.exists():
+            return Path(marker.read_text().strip())
 
     return toplevel
 
@@ -210,3 +221,30 @@ def resolvePrBranch(pr_number: int, cwd: Path | None = None) -> tuple[str, str]:
         return data["headRefName"], data["baseRefName"]
     except (subprocess.CalledProcessError, FileNotFoundError, KeyError) as e:
         raise TimberlineError(f"Failed to resolve PR #{pr_number} (is gh CLI installed?)") from e
+
+
+# ─── Clone (checkout mode) helpers ────────────────────────────────────────────
+
+
+def getRemoteUrl(remote: str = "origin", cwd: Path | None = None) -> str:
+    """Get remote URL from repo."""
+    return runGit("remote", "get-url", remote, cwd=cwd)
+
+
+def cloneLocal(repo_root: Path, target_path: Path, remote_url: str) -> None:
+    """Clone repo locally with hardlinks, then fix remote URL back to actual origin."""
+    runGit("clone", "--local", "--no-checkout", str(repo_root), str(target_path))
+    # fix remote to point at actual origin (not local parent)
+    runGit("remote", "set-url", "origin", remote_url, cwd=target_path)
+    runGit("fetch", "origin", cwd=target_path)
+
+
+def cloneCheckoutNewBranch(branch: str, base: str, cwd: Path) -> None:
+    """Create and checkout a new branch from origin/<base> in a clone."""
+    runGit("checkout", "-b", branch, f"origin/{base}", cwd=cwd)
+
+
+def cloneCheckoutExistingBranch(branch: str, cwd: Path) -> None:
+    """Fetch and checkout an existing remote branch in a clone."""
+    runGit("fetch", "origin", branch, cwd=cwd)
+    runGit("checkout", "-b", branch, f"origin/{branch}", cwd=cwd)

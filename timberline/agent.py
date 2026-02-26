@@ -63,12 +63,13 @@ def buildContextBlock(
 ) -> str:
     others = [wt.name for wt in all_worktrees if wt.name != info.name]
     others_str = ", ".join(others) if others else "none"
+    mode_desc = "local clone" if info.mode == "checkout" else "git worktree"
 
     return f"""{_MARKER_START}
 
 # Timberline Worktree Context
 
-You are working in a **Timberline-managed git worktree**.
+You are working in a **Timberline-managed {mode_desc}**.
 
 | Key         | Value                            |
 |-------------|----------------------------------|

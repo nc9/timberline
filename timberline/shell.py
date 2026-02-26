@@ -17,6 +17,8 @@ tl-prompt() {
         echo "🪓 $TL_WORKTREE"
     elif [ -f .git ] && grep -q ".timberline/projects/" .git 2>/dev/null; then
         echo "🪓 $(basename "$PWD")"
+    elif echo "$PWD" | grep -q '/.timberline/projects/.*/worktrees/' 2>/dev/null; then
+        echo "🪓 $(basename "$PWD")"
     fi
 }
 """
@@ -34,6 +36,8 @@ tl-prompt() {
     if [[ -n "$TL_WORKTREE" ]]; then
         echo "🪓 $TL_WORKTREE"
     elif [[ -f .git ]] && grep -q ".timberline/projects/" .git 2>/dev/null; then
+        echo "🪓 $(basename "$PWD")"
+    elif [[ "$PWD" == */.timberline/projects/*/worktrees/* ]]; then
         echo "🪓 $(basename "$PWD")"
     fi
 }
@@ -69,6 +73,8 @@ function tl-prompt
     if test -n "$TL_WORKTREE"
         echo "🪓 $TL_WORKTREE"
     else if test -f .git; and grep -q ".timberline/projects/" .git 2>/dev/null
+        echo "🪓 "(basename $PWD)
+    else if string match -q '*/.timberline/projects/*/worktrees/*' $PWD
         echo "🪓 "(basename $PWD)
     end
 end

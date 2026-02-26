@@ -58,6 +58,8 @@ from timberline.models import (
     TimberlineConfig,
     TimberlineError,
     WorktreeInfo,
+    WorktreeMode,
+    getWorktreeBasePath,
     resolveProjectName,
     writeRepoRootMarker,
 )
@@ -71,7 +73,9 @@ from timberline.state import loadState, saveState, updateWorktreeBranch
 from timberline.submodules import hasSubmodules, initSubmodules
 from timberline.worktree import (
     archiveWorktreeDomain,
+    checkoutClone,
     checkoutWorktree,
+    createCheckoutClone,
     createWorktree,
     getWorktree,
     listWorktrees,
@@ -297,6 +301,13 @@ def init(
     else:
         project_name = typer.prompt("Project name", default=default_project)
 
+    # working copy mode
+    if defaults:
+        mode = WorktreeMode.CHECKOUT
+    else:
+        use_checkout = typer.confirm("Use local clones instead of git worktrees?", default=True)
+        mode = WorktreeMode.CHECKOUT if use_checkout else WorktreeMode.WORKTREE
+
     if not defaults:
         printSuccess(f"Git root: {repo_root}")
         if env_files:
@@ -312,6 +323,7 @@ def init(
         naming_scheme=naming,
         pre_land=pre_land,
         project_name=project_name,
+        mode=mode,
         init=InitConfig(init_command=init_command) if init_command else InitConfig(),
         agent=AgentConfig(
             name=default_agent,
@@ -405,7 +417,14 @@ def new_cmd(
     config = _loadCfg(repo_root)
 
     try:
-        info = createWorktree(repo_root, config, name=name, branch=branch, base=base, type_=type_)
+        if config.mode == WorktreeMode.CHECKOUT:
+            info = createCheckoutClone(
+                repo_root, config, name=name, branch=branch, base=base, type_=type_
+            )
+        else:
+            info = createWorktree(
+                repo_root, config, name=name, branch=branch, base=base, type_=type_
+            )
     except TimberlineError as e:
         printError(str(e))
         raise typer.Exit(1) from e
@@ -504,14 +523,24 @@ def checkout_cmd(
             raise typer.Exit(1) from e
 
     try:
-        info = checkoutWorktree(
-            repo_root,
-            config,
-            resolved_branch,  # type: ignore[arg-type]
-            name=name,
-            base_branch=base_branch,
-            pr=pr_number,
-        )
+        if config.mode == WorktreeMode.CHECKOUT:
+            info = checkoutClone(
+                repo_root,
+                config,
+                resolved_branch,  # type: ignore[arg-type]
+                name=name,
+                base_branch=base_branch,
+                pr=pr_number,
+            )
+        else:
+            info = checkoutWorktree(
+                repo_root,
+                config,
+                resolved_branch,  # type: ignore[arg-type]
+                name=name,
+                base_branch=base_branch,
+                pr=pr_number,
+            )
     except TimberlineError as e:
         printError(str(e))
         raise typer.Exit(1) from e
@@ -782,7 +811,7 @@ def sync(
     repo_root = _resolveRoot()
     config = _loadCfg(repo_root)
 
-    # fetch first
+    # fetch first — for worktree mode, single fetch covers all
     with contextlib.suppress(TimberlineError):
         runGit("fetch", "--all", "--prune", cwd=repo_root)
 
@@ -798,6 +827,9 @@ def sync(
         base = wt.base_branch or config.base_branch
         cmd = "merge" if merge else "rebase"
         try:
+            # checkout clones have their own remote — fetch per-clone
+            if wt.mode == "checkout":
+                runGit("fetch", "--all", "--prune", cwd=wt_path)
             runGit(cmd, f"origin/{base}", cwd=wt_path)
             printSuccess(f"Synced {wt.name} ({cmd} on {base})")
         except TimberlineError as e:
@@ -1043,6 +1075,24 @@ def clean(
     else:
         runGit("worktree", "prune", cwd=repo_root)
         printSuccess("Pruned stale worktrees")
+
+    # clean orphaned checkout directories (dirs in worktrees/ not in state)
+    project_name = resolveProjectName(repo_root, config.project_name)
+    wt_base = getWorktreeBasePath(project_name)
+    if wt_base.exists():
+        from timberline.state import loadState as _loadState
+
+        state = _loadState(project_name, repo_root)
+        known_names = set(state.worktrees.keys())
+        for child in wt_base.iterdir():
+            if child.is_dir() and child.name not in known_names:
+                if dry_run:
+                    printSuccess(f"Would remove orphaned dir: {child}")
+                else:
+                    import shutil
+
+                    shutil.rmtree(child)
+                    printSuccess(f"Removed orphaned dir: {child.name}")
 
     # reconcile state
     worktrees = listWorktrees(repo_root, config)
